@@ -111,6 +111,23 @@ export function MiddlePanel({ state, dispatch, onSendToSora, isSending }: Props)
           );
         })}
 
+        {/* Generated first frame preview */}
+        {state.referenceFrameUrl && state.status !== "error" && (
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-foreground">Reference Frame (AI-generated)</label>
+            <div className="rounded-lg overflow-hidden border border-border bg-black">
+              <img
+                src={state.referenceFrameUrl}
+                alt="AI-generated first frame"
+                className="w-full max-h-[300px] object-contain"
+              />
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              This composed frame will be used as Sora&apos;s visual starting point for the video.
+            </p>
+          </div>
+        )}
+
         {/* Error display */}
         {state.status === "error" && state.errorMessage && (
           <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3">

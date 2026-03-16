@@ -3,6 +3,7 @@ import { requireAuth, isAuthError } from "@/lib/auth";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { generateSoraPrompt } from "@/lib/claude";
+import { generateFirstFrame } from "@/lib/image-gen";
 import { estimateCost } from "@/lib/sora";
 import { eq } from "drizzle-orm";
 
@@ -77,7 +78,32 @@ export async function POST(req: NextRequest) {
 
     const cost = estimateCost(duration);
 
-    // Update generation with Claude output
+    // Generate composed first frame if product image was uploaded
+    let referenceFrameUrl: string | null = null;
+    if (productImageUrl) {
+      try {
+        referenceFrameUrl = await generateFirstFrame({
+          productImageUrl,
+          sceneDescription: promptResult.sceneDescription,
+          aspectRatio,
+          characterDetails: {
+            ageRange,
+            gender,
+            profile,
+            makeup,
+            expression,
+            hair,
+            clothing,
+          },
+          generationId: generation.id,
+        });
+      } catch (frameErr) {
+        console.error("[generate] First frame generation failed, continuing without:", frameErr);
+        // Non-fatal — continue without the composed frame
+      }
+    }
+
+    // Update generation with Claude output + frame
     const [updated] = await db
       .update(schema.generations)
       .set({
@@ -87,6 +113,7 @@ export async function POST(req: NextRequest) {
         negativePrompt: promptResult.negativePrompt,
         fullPrompt,
         estimatedCost: cost,
+        thumbnailUrl: referenceFrameUrl,
         status: "prompt_ready",
         updatedAt: new Date(),
       })
@@ -101,6 +128,7 @@ export async function POST(req: NextRequest) {
       negativePrompt: updated.negativePrompt,
       fullPrompt: updated.fullPrompt,
       estimatedCost: updated.estimatedCost,
+      referenceFrameUrl: updated.thumbnailUrl,
       status: updated.status,
     });
   } catch (err) {

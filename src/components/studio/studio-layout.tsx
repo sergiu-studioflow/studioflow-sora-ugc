@@ -33,6 +33,7 @@ export type StudioState = {
   videoUrl: string;
   errorMessage: string;
   progress: number;
+  referenceFrameUrl: string;
 };
 
 export type Action =
@@ -66,6 +67,7 @@ const initialState: StudioState = {
   videoUrl: "",
   errorMessage: "",
   progress: 0,
+  referenceFrameUrl: "",
 };
 
 function reducer(state: StudioState, action: Action): StudioState {
@@ -132,6 +134,7 @@ export function StudioLayout() {
           negativePrompt: data.negativePrompt || "",
           fullPrompt: data.fullPrompt || "",
           estimatedCost: data.estimatedCost || "",
+          referenceFrameUrl: data.referenceFrameUrl || "",
         },
       });
     } catch (err) {
