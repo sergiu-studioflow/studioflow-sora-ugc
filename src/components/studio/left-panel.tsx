@@ -202,25 +202,6 @@ export function LeftPanel({ state, dispatch, onGenerate, isGenerating, onUploadi
           ))}
         </div>
 
-        {/* Generate Script Button */}
-        <Button
-          onClick={onGenerate}
-          disabled={isGenerating || uploading || !state.creativeDirection.trim()}
-          className="w-full"
-        >
-          {isGenerating ? (
-            <span className="flex items-center gap-2">
-              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
-              Generating...
-            </span>
-          ) : (
-            <span className="flex items-center gap-2">
-              <Sparkles className="h-3.5 w-3.5" />
-              Generate Script
-            </span>
-          )}
-        </Button>
-
         {/* Product Image Upload */}
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -339,6 +320,25 @@ export function LeftPanel({ state, dispatch, onGenerate, isGenerating, onUploadi
         >
           <Shuffle className="h-3.5 w-3.5 mr-2" />
           Random
+        </Button>
+
+        {/* Generate Script Button */}
+        <Button
+          onClick={onGenerate}
+          disabled={isGenerating || uploading || !state.creativeDirection.trim()}
+          className="w-full"
+        >
+          {isGenerating ? (
+            <span className="flex items-center gap-2">
+              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+              Generating...
+            </span>
+          ) : (
+            <span className="flex items-center gap-2">
+              <Sparkles className="h-3.5 w-3.5" />
+              Generate Script
+            </span>
+          )}
         </Button>
       </div>
     </div>
