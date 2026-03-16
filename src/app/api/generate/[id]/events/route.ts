@@ -1,7 +1,8 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { requireAuth, isAuthError } from "@/lib/auth";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -10,7 +11,11 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authResult = await requireAuth();
+  if (isAuthError(authResult)) return authResult;
+
   const { id } = await params;
+  const userId = authResult.portalUser.id;
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -37,7 +42,7 @@ export async function GET(
           const [gen] = await db
             .select()
             .from(schema.generations)
-            .where(eq(schema.generations.id, id))
+            .where(and(eq(schema.generations.id, id), eq(schema.generations.userId, userId)))
             .limit(1);
 
           if (!gen) {
