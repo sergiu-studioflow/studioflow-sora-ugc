@@ -1,8 +1,23 @@
-import OpenAI from "openai";
+const OPENAI_API_BASE = "https://api.openai.com/v1";
 
-function getClient() {
-  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+function getApiKey(): string {
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) throw new Error("OPENAI_API_KEY is not set");
+  return key;
 }
+
+function authHeaders(): Record<string, string> {
+  return {
+    Authorization: `Bearer ${getApiKey()}`,
+    "Content-Type": "application/json",
+  };
+}
+
+const sizeMap: Record<string, string> = {
+  "9:16": "1080x1920",
+  "16:9": "1920x1080",
+  "720p": "1280x720",
+};
 
 export type SoraJobResult = {
   jobId: string;
@@ -21,75 +36,78 @@ export async function submitSoraJob(params: {
   referenceImageUrl?: string;
   model?: string;
 }): Promise<SoraJobResult> {
-  // Map aspect ratios to Sora format
-  const aspectMap: Record<string, string> = {
-    "9:16": "9:16",
-    "16:9": "16:9",
-    "720p": "16:9",
-  };
-
-  const response = await getClient().responses.create({
-    model: params.model || "sora-2",
-    input: params.prompt,
-    tools: [{
-      type: "video_generation" as any,
-      // Video generation parameters
+  const response = await fetch(`${OPENAI_API_BASE}/videos/generations`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({
+      model: params.model || "sora",
+      prompt: params.prompt,
+      size: sizeMap[params.aspectRatio] || "1080x1920",
       duration: params.duration,
-      aspect_ratio: aspectMap[params.aspectRatio] || "9:16",
-      ...(params.referenceImageUrl && {
-        image: { url: params.referenceImageUrl },
-      }),
-    }] as any,
+      n: 1,
+    }),
   });
 
-  // Extract job/generation ID from response
-  const jobId = response.id;
-  return { jobId };
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(
+      err?.error?.message || `Sora API error: ${response.status} ${response.statusText}`
+    );
+  }
+
+  const data = await response.json();
+  return { jobId: data.id };
 }
 
 export async function pollSoraJob(jobId: string): Promise<SoraPollResult> {
   try {
-    const response = await getClient().responses.retrieve(jobId);
+    const response = await fetch(`${OPENAI_API_BASE}/videos/generations/${jobId}`, {
+      headers: {
+        Authorization: `Bearer ${getApiKey()}`,
+      },
+    });
 
-    // Check output for video generation results
-    const output = (response as any).output || [];
-    const videoOutput = output.find((o: any) => o.type === "video_generation_call");
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      return {
+        status: "failed",
+        error: err?.error?.message || `Poll error: ${response.status}`,
+      };
+    }
 
-    if (response.status === "completed" && videoOutput?.generation_id) {
-      // Get the actual video content
-      try {
-        const videoResponse = await getClient().responses.retrieve(jobId);
-        const videoData = ((videoResponse as any).output || []).find(
-          (o: any) => o.type === "video_generation_call"
-        );
+    const data = await response.json();
 
-        if (videoData?.video_url) {
-          return { status: "completed", videoUrl: videoData.video_url };
-        }
-
-        // Try fetching video via generation_id
-        return { status: "completed", videoUrl: `https://api.openai.com/v1/video/generations/${videoOutput.generation_id}/content` };
-      } catch {
-        return { status: "processing" };
+    if (data.status === "completed") {
+      const videoUrl = data.data?.[0]?.url;
+      if (videoUrl) {
+        return { status: "completed", videoUrl };
       }
+      return { status: "completed", error: "Video completed but no URL returned" };
     }
 
-    if (response.status === "failed") {
-      return { status: "failed", error: (response as any).error?.message || "Video generation failed" };
+    if (data.status === "failed") {
+      return {
+        status: "failed",
+        error: data.error?.message || "Video generation failed",
+      };
     }
 
-    if (response.status === "in_progress") {
+    if (data.status === "in_progress") {
       return { status: "processing" };
     }
 
     return { status: "pending" };
   } catch (err) {
-    return { status: "failed", error: err instanceof Error ? err.message : "Failed to poll Sora job" };
+    return {
+      status: "failed",
+      error: err instanceof Error ? err.message : "Failed to poll Sora job",
+    };
   }
 }
 
-export function estimateCost(duration: number, model: string = "sora-2"): string {
+export function estimateCost(duration: number, model: string = "sora"): string {
   const rates: Record<string, number> = {
+    sora: 0.10,
     "sora-2": 0.10,
     "sora-2-pro": 0.50,
   };
