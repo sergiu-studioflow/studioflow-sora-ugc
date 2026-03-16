@@ -1,23 +1,22 @@
 import { put } from "@vercel/blob";
 
-const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta";
+const KIE_API_BASE = "https://api.kie.ai/api/v1/jobs";
 
-function getGeminiKey(): string {
-  const key = process.env.GOOGLE_API_KEY;
-  if (!key) throw new Error("GOOGLE_API_KEY is not set");
+function getKieKey(): string {
+  const key = process.env.KIE_API_KEY;
+  if (!key) throw new Error("KIE_API_KEY is not set");
   return key;
 }
 
-// Maps aspect ratio to Gemini-supported aspect ratios
-const geminiAspectMap: Record<string, string> = {
+// Maps aspect ratio to Kie AI supported aspect ratios
+const kieAspectMap: Record<string, string> = {
   "9:16": "9:16",
   "16:9": "16:9",
   "720p": "16:9",
 };
 
 /**
- * Generates a composed first frame using Gemini Nano Banana 2 Pro
- * (gemini-3.1-flash-image-preview).
+ * Generates a composed first frame using Kie AI's Nano Banana Pro.
  * Takes the product image as visual reference and the scene description
  * to create a realistic first frame showing the character holding the product.
  * Returns the Vercel Blob URL of the generated frame.
@@ -38,92 +37,108 @@ export async function generateFirstFrame(params: {
   generationId: string;
 }): Promise<string> {
   const framePrompt = buildFramePrompt(params);
-  const aspectRatio = geminiAspectMap[params.aspectRatio] || "9:16";
+  const aspectRatio = kieAspectMap[params.aspectRatio] || "9:16";
 
-  // Download the product image and convert to base64
-  const productRes = await fetch(params.productImageUrl);
-  if (!productRes.ok) {
-    throw new Error("Failed to download product image for frame generation");
-  }
-  const productBuffer = Buffer.from(await productRes.arrayBuffer());
-  const productBase64 = productBuffer.toString("base64");
-  const mimeType = productRes.headers.get("content-type") || "image/png";
-
-  // Call Gemini Nano Banana 2 (gemini-3.1-flash-image-preview)
-  const model = "gemini-3.1-flash-image-preview";
-  const url = `${GEMINI_API_BASE}/models/${model}:generateContent?key=${getGeminiKey()}`;
-
-  const requestBody = {
-    contents: [
-      {
-        parts: [
-          { text: framePrompt },
-          {
-            inline_data: {
-              mime_type: mimeType,
-              data: productBase64,
-            },
-          },
-        ],
-      },
-    ],
-    generationConfig: {
-      responseModalities: ["IMAGE"],
-      imageConfig: {
-        aspectRatio,
-        imageSize: "1K",
-      },
-    },
-  };
-
-  const response = await fetch(url, {
+  // Step 1: Create the task
+  const createResponse = await fetch(`${KIE_API_BASE}/createTask`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(requestBody),
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${getKieKey()}`,
+    },
+    body: JSON.stringify({
+      model: "nano-banana-pro",
+      input: {
+        prompt: framePrompt,
+        image_input: [params.productImageUrl],
+        aspect_ratio: aspectRatio,
+        resolution: "1K",
+        output_format: "png",
+      },
+    }),
   });
 
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    const errMsg =
-      err?.error?.message ||
-      `Gemini image generation error: ${response.status}`;
-    throw new Error(errMsg);
+  if (!createResponse.ok) {
+    const err = await createResponse.json().catch(() => ({}));
+    throw new Error(
+      err?.msg || `Kie AI task creation failed: ${createResponse.status}`
+    );
   }
 
-  const data = await response.json();
-
-  // Extract inline image data from response
-  const candidate = data.candidates?.[0];
-  if (!candidate) {
-    throw new Error("No candidates returned from Gemini image generation");
+  const createData = await createResponse.json();
+  if (createData.code !== 200 || !createData.data?.taskId) {
+    throw new Error(createData.msg || "Kie AI did not return a task ID");
   }
 
-  let imageBase64: string | null = null;
-  let imageMime = "image/png";
+  const taskId = createData.data.taskId;
+  console.log("[image-gen] Kie AI task created:", taskId);
 
-  for (const part of candidate.content?.parts || []) {
-    if (part.inline_data?.data) {
-      imageBase64 = part.inline_data.data;
-      imageMime = part.inline_data.mime_type || "image/png";
-      break;
+  // Step 2: Poll for completion (max 90 seconds)
+  const maxPolls = 30;
+  const pollInterval = 3000;
+
+  for (let i = 0; i < maxPolls; i++) {
+    await new Promise((r) => setTimeout(r, pollInterval));
+
+    const statusResponse = await fetch(
+      `${KIE_API_BASE}/recordInfo?taskId=${encodeURIComponent(taskId)}`,
+      {
+        headers: {
+          Authorization: `Bearer ${getKieKey()}`,
+        },
+      }
+    );
+
+    if (!statusResponse.ok) continue;
+
+    const statusData = await statusResponse.json();
+    const state = statusData.data?.state;
+
+    if (state === "success") {
+      // Parse resultJson to get the image URL
+      let resultUrls: string[] = [];
+      try {
+        const resultJson = JSON.parse(statusData.data.resultJson);
+        resultUrls = resultJson.resultUrls || [];
+      } catch {
+        throw new Error("Failed to parse Kie AI result JSON");
+      }
+
+      if (resultUrls.length === 0) {
+        throw new Error("No image URLs in Kie AI result");
+      }
+
+      const sourceImageUrl = resultUrls[0];
+      console.log("[image-gen] Kie AI image ready:", sourceImageUrl);
+
+      // Download and persist to Vercel Blob (Kie URLs expire after 24h)
+      const imageRes = await fetch(sourceImageUrl);
+      if (!imageRes.ok) {
+        throw new Error("Failed to download generated frame from Kie AI");
+      }
+
+      const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
+      const blob = await put(
+        `frames/${params.generationId}.png`,
+        imageBuffer,
+        { access: "public", contentType: "image/png" }
+      );
+
+      console.log("[image-gen] Frame persisted to Vercel Blob:", blob.url);
+      return blob.url;
     }
+
+    if (state === "fail") {
+      throw new Error(
+        statusData.data?.failMsg || "Kie AI image generation failed"
+      );
+    }
+
+    // Still waiting/queuing/generating — continue polling
+    console.log("[image-gen] Kie AI task state:", state);
   }
 
-  if (!imageBase64) {
-    throw new Error("No image data in Gemini response");
-  }
-
-  const imageBuffer = Buffer.from(imageBase64, "base64");
-  const ext = imageMime.includes("jpeg") ? "jpg" : "png";
-
-  // Upload to Vercel Blob
-  const blob = await put(
-    `frames/${params.generationId}.${ext}`,
-    imageBuffer,
-    { access: "public", contentType: imageMime }
-  );
-
-  return blob.url;
+  throw new Error("Kie AI image generation timed out after 90 seconds");
 }
 
 function buildFramePrompt(params: {
