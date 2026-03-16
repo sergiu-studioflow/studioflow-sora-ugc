@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, isAuthError } from "@/lib/auth";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +19,7 @@ export async function GET(
     const [generation] = await db
       .select()
       .from(schema.generations)
-      .where(eq(schema.generations.id, id))
+      .where(and(eq(schema.generations.id, id), eq(schema.generations.userId, authResult.portalUser.id)))
       .limit(1);
 
     if (!generation) {
