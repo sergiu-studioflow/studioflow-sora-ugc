@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, type Dispatch } from "react";
-import { Upload, Sparkles, Shuffle, X } from "lucide-react";
+import { upload } from "@vercel/blob/client";
+import { Upload as UploadIcon, Sparkles, Shuffle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -41,31 +42,16 @@ export function LeftPanel({ state, dispatch, onGenerate, isGenerating, onUploadi
     dispatch({ type: "SET_FIELD", field: "productImagePreview", value: preview });
 
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
-      console.log("[upload] Response status:", res.status, "redirected:", res.redirected, "url:", res.url);
-
-      if (res.redirected || !res.ok) {
-        const text = await res.text().catch(() => "");
-        console.error("[upload] Failed - status:", res.status, "body:", text.slice(0, 200));
-        alert(`Upload failed (${res.status}): ${res.redirected ? "Redirected to " + res.url : text.slice(0, 100)}`);
-        return;
-      }
-
-      const data = await res.json();
-      console.log("[upload] Response:", JSON.stringify(data));
-      if (data.url) {
-        dispatch({ type: "SET_FIELD", field: "productImageUrl", value: data.url });
-        console.log("[upload] productImageUrl set to:", data.url);
-      } else {
-        console.error("[upload] No URL in response:", JSON.stringify(data));
-        alert(`Upload failed: ${data.error || "Unknown error"}`);
-      }
+      // Client-side upload directly to Vercel Blob (bypasses 4.5MB serverless limit)
+      const blob = await upload(`references/${file.name}`, file, {
+        access: "public",
+        handleUploadUrl: "/api/upload",
+      });
+      console.log("[upload] Blob uploaded:", blob.url);
+      dispatch({ type: "SET_FIELD", field: "productImageUrl", value: blob.url });
     } catch (err) {
       console.error("[upload] Upload failed:", err);
       alert(`Upload error: ${err instanceof Error ? err.message : "Unknown"}`);
-      // Keep preview even if upload fails
     } finally {
       setUploading(false);
       onUploadingChange?.(false);
@@ -270,7 +256,7 @@ export function LeftPanel({ state, dispatch, onGenerate, isGenerating, onUploadi
                 dragOver ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground"
               )}
             >
-              <Upload className="h-5 w-5 text-muted-foreground" />
+              <UploadIcon className="h-5 w-5 text-muted-foreground" />
               <span className="text-xs text-muted-foreground">Drop image or click</span>
             </div>
           )}
