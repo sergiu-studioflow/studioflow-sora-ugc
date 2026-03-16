@@ -44,6 +44,15 @@ export function LeftPanel({ state, dispatch, onGenerate, isGenerating, onUploadi
       const formData = new FormData();
       formData.append("file", file);
       const res = await fetch("/api/upload", { method: "POST", body: formData });
+      console.log("[upload] Response status:", res.status, "redirected:", res.redirected, "url:", res.url);
+
+      if (res.redirected || !res.ok) {
+        const text = await res.text().catch(() => "");
+        console.error("[upload] Failed - status:", res.status, "body:", text.slice(0, 200));
+        alert(`Upload failed (${res.status}): ${res.redirected ? "Redirected to " + res.url : text.slice(0, 100)}`);
+        return;
+      }
+
       const data = await res.json();
       console.log("[upload] Response:", JSON.stringify(data));
       if (data.url) {
@@ -55,6 +64,7 @@ export function LeftPanel({ state, dispatch, onGenerate, isGenerating, onUploadi
       }
     } catch (err) {
       console.error("[upload] Upload failed:", err);
+      alert(`Upload error: ${err instanceof Error ? err.message : "Unknown"}`);
       // Keep preview even if upload fails
     } finally {
       setUploading(false);
