@@ -34,6 +34,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Creative direction is required" }, { status: 400 });
     }
 
+    console.log("[generate] productImageUrl received:", productImageUrl || "(empty)");
+
     // Create generation record
     const [generation] = await db
       .insert(schema.generations)
@@ -80,7 +82,9 @@ export async function POST(req: NextRequest) {
 
     // Generate composed first frame if product image was uploaded
     let referenceFrameUrl: string | null = null;
+    let frameError: string | null = null;
     if (productImageUrl) {
+      console.log("[generate] Starting Gemini first frame generation for:", generation.id);
       try {
         referenceFrameUrl = await generateFirstFrame({
           productImageUrl,
@@ -97,10 +101,14 @@ export async function POST(req: NextRequest) {
           },
           generationId: generation.id,
         });
+        console.log("[generate] First frame generated:", referenceFrameUrl);
       } catch (frameErr) {
-        console.error("[generate] First frame generation failed, continuing without:", frameErr);
+        frameError = frameErr instanceof Error ? frameErr.message : "Unknown frame generation error";
+        console.error("[generate] First frame generation failed:", frameError);
         // Non-fatal — continue without the composed frame
       }
+    } else {
+      console.log("[generate] No productImageUrl provided, skipping frame generation");
     }
 
     // Update generation with Claude output + frame
@@ -129,6 +137,7 @@ export async function POST(req: NextRequest) {
       fullPrompt: updated.fullPrompt,
       estimatedCost: updated.estimatedCost,
       referenceFrameUrl: updated.thumbnailUrl,
+      frameError,
       status: updated.status,
     });
   } catch (err) {

@@ -34,6 +34,7 @@ export type StudioState = {
   errorMessage: string;
   progress: number;
   referenceFrameUrl: string;
+  frameError: string;
 };
 
 export type Action =
@@ -68,6 +69,7 @@ const initialState: StudioState = {
   errorMessage: "",
   progress: 0,
   referenceFrameUrl: "",
+  frameError: "",
 };
 
 function reducer(state: StudioState, action: Action): StudioState {
@@ -94,6 +96,7 @@ export function StudioLayout() {
   const handleGenerateScript = useCallback(async () => {
     if (!state.creativeDirection.trim() || isUploading) return;
 
+    console.log("[studio] Generating with productImageUrl:", state.productImageUrl || "(empty)");
     setIsGeneratingPrompt(true);
     dispatch({ type: "SET_GENERATION", payload: { status: "generating_prompt", errorMessage: "" } });
 
@@ -135,6 +138,7 @@ export function StudioLayout() {
           fullPrompt: data.fullPrompt || "",
           estimatedCost: data.estimatedCost || "",
           referenceFrameUrl: data.referenceFrameUrl || "",
+          frameError: data.frameError || "",
         },
       });
     } catch (err) {

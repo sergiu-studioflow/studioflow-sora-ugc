@@ -45,10 +45,15 @@ export function LeftPanel({ state, dispatch, onGenerate, isGenerating, onUploadi
       formData.append("file", file);
       const res = await fetch("/api/upload", { method: "POST", body: formData });
       const data = await res.json();
+      console.log("[upload] Response:", data);
       if (data.url) {
         dispatch({ type: "SET_FIELD", field: "productImageUrl", value: data.url });
+        console.log("[upload] productImageUrl set to:", data.url);
+      } else {
+        console.error("[upload] No URL in response:", data);
       }
-    } catch {
+    } catch (err) {
+      console.error("[upload] Upload failed:", err);
       // Keep preview even if upload fails
     } finally {
       setUploading(false);
@@ -240,6 +245,16 @@ export function LeftPanel({ state, dispatch, onGenerate, isGenerating, onUploadi
               {uploading && (
                 <div className="absolute inset-0 flex items-center justify-center bg-background/60 rounded-lg">
                   <span className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                </div>
+              )}
+              {!uploading && state.productImageUrl && (
+                <div className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-green-600/80 text-[10px] text-white">
+                  Uploaded
+                </div>
+              )}
+              {!uploading && !state.productImageUrl && state.productImagePreview && (
+                <div className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-red-600/80 text-[10px] text-white">
+                  Upload failed
                 </div>
               )}
             </div>
