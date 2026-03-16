@@ -53,7 +53,7 @@ const initialState: StudioState = {
   productImageUrl: "",
   productImagePreview: "",
   aspectRatio: "9:16",
-  duration: 16,
+  duration: 8,
   generationId: null,
   status: "draft",
   sceneDescription: "",
