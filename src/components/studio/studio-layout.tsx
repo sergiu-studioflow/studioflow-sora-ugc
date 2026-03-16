@@ -6,7 +6,7 @@ import { MiddlePanel } from "./middle-panel";
 import { RightPanel } from "./right-panel";
 import type { GenerationStatus } from "@/lib/types";
 
-type StudioState = {
+export type StudioState = {
   // Form inputs
   creativeDirection: string;
   archetypeId: string;
@@ -34,7 +34,7 @@ type StudioState = {
   errorMessage: string;
 };
 
-type Action =
+export type Action =
   | { type: "SET_FIELD"; field: keyof StudioState; value: string | number }
   | { type: "SET_ARCHETYPE"; payload: Partial<StudioState> }
   | { type: "SET_GENERATION"; payload: Partial<StudioState> }
