@@ -3,7 +3,7 @@ import { requireAuth, isAuthError } from "@/lib/auth";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { submitSoraJob, pollSoraJob } from "@/lib/sora";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // 5 minutes for Vercel
@@ -23,7 +23,7 @@ export async function POST(
     const [generation] = await db
       .select()
       .from(schema.generations)
-      .where(eq(schema.generations.id, id))
+      .where(and(eq(schema.generations.id, id), eq(schema.generations.userId, authResult.portalUser.id)))
       .limit(1);
 
     if (!generation) {
