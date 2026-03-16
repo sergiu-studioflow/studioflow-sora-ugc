@@ -90,8 +90,8 @@ export function MiddlePanel({ state, dispatch, onSendToSora, isSending }: Props)
           <span>Style: authentic UGC phone video</span>
         </div>
 
-        {/* Prompt sections */}
-        {sections.map(({ key, label }) => {
+        {/* Prompt sections (hidden when error) */}
+        {state.status !== "error" && sections.map(({ key, label }) => {
           const value = (state as any)[key] || "";
           return (
             <div key={key} className="space-y-1.5">
