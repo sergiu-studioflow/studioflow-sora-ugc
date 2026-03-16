@@ -6,16 +6,10 @@ function getApiKey(): string {
   return key;
 }
 
-function authHeaders(): Record<string, string> {
-  return {
-    Authorization: `Bearer ${getApiKey()}`,
-    "Content-Type": "application/json",
-  };
-}
-
+// Maps our aspect ratio labels to Sora's accepted size values
 const sizeMap: Record<string, string> = {
-  "9:16": "1080x1920",
-  "16:9": "1920x1080",
+  "9:16": "720x1280",
+  "16:9": "1280x720",
   "720p": "1280x720",
 };
 
@@ -26,8 +20,16 @@ export type SoraJobResult = {
 export type SoraPollResult = {
   status: "pending" | "processing" | "completed" | "failed";
   videoUrl?: string;
+  progress?: number;
   error?: string;
 };
+
+// Clamp user-selected duration to Sora's allowed values: 4, 8, 12
+function clampDuration(d: number): string {
+  if (d <= 4) return "4";
+  if (d <= 8) return "8";
+  return "12";
+}
 
 export async function submitSoraJob(params: {
   prompt: string;
@@ -36,16 +38,24 @@ export async function submitSoraJob(params: {
   referenceImageUrl?: string;
   model?: string;
 }): Promise<SoraJobResult> {
-  const response = await fetch(`${OPENAI_API_BASE}/videos/generations`, {
+  const body: Record<string, unknown> = {
+    model: params.model || "sora-2",
+    prompt: params.prompt,
+    size: sizeMap[params.aspectRatio] || "720x1280",
+    seconds: clampDuration(params.duration),
+  };
+
+  if (params.referenceImageUrl) {
+    body.input_reference = { image_url: params.referenceImageUrl };
+  }
+
+  const response = await fetch(`${OPENAI_API_BASE}/videos`, {
     method: "POST",
-    headers: authHeaders(),
-    body: JSON.stringify({
-      model: params.model || "sora",
-      prompt: params.prompt,
-      size: sizeMap[params.aspectRatio] || "1080x1920",
-      duration: params.duration,
-      n: 1,
-    }),
+    headers: {
+      Authorization: `Bearer ${getApiKey()}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {
@@ -61,7 +71,7 @@ export async function submitSoraJob(params: {
 
 export async function pollSoraJob(jobId: string): Promise<SoraPollResult> {
   try {
-    const response = await fetch(`${OPENAI_API_BASE}/videos/generations/${jobId}`, {
+    const response = await fetch(`${OPENAI_API_BASE}/videos/${jobId}`, {
       headers: {
         Authorization: `Bearer ${getApiKey()}`,
       },
@@ -78,11 +88,9 @@ export async function pollSoraJob(jobId: string): Promise<SoraPollResult> {
     const data = await response.json();
 
     if (data.status === "completed") {
-      const videoUrl = data.data?.[0]?.url;
-      if (videoUrl) {
-        return { status: "completed", videoUrl };
-      }
-      return { status: "completed", error: "Video completed but no URL returned" };
+      // Video content is downloadable via /v1/videos/{id}/content
+      const videoUrl = `${OPENAI_API_BASE}/videos/${jobId}/content`;
+      return { status: "completed", videoUrl, progress: 100 };
     }
 
     if (data.status === "failed") {
@@ -93,10 +101,11 @@ export async function pollSoraJob(jobId: string): Promise<SoraPollResult> {
     }
 
     if (data.status === "in_progress") {
-      return { status: "processing" };
+      return { status: "processing", progress: data.progress || 0 };
     }
 
-    return { status: "pending" };
+    // "queued"
+    return { status: "pending", progress: data.progress || 0 };
   } catch (err) {
     return {
       status: "failed",
@@ -105,13 +114,14 @@ export async function pollSoraJob(jobId: string): Promise<SoraPollResult> {
   }
 }
 
-export function estimateCost(duration: number, model: string = "sora"): string {
+export function estimateCost(duration: number, model: string = "sora-2"): string {
+  // Pricing per second by resolution tier (using 720p default rates)
   const rates: Record<string, number> = {
-    sora: 0.10,
-    "sora-2": 0.10,
+    "sora-2": 0.30,
     "sora-2-pro": 0.50,
   };
-  const rate = rates[model] || 0.10;
-  const cost = duration * rate;
+  const seconds = Number(clampDuration(duration));
+  const rate = rates[model] || 0.30;
+  const cost = seconds * rate;
   return `$${cost.toFixed(2)}`;
 }
