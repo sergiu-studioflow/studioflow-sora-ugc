@@ -1,6 +1,14 @@
 import { put } from "@vercel/blob";
+import sharp from "sharp";
 
 const KIE_API_BASE = "https://api.kie.ai/api/v1/jobs";
+
+// Sora requires exact pixel dimensions for reference images
+const soraResolutionMap: Record<string, { width: number; height: number }> = {
+  "9:16": { width: 720, height: 1280 },
+  "16:9": { width: 1280, height: 720 },
+  "720p": { width: 1280, height: 720 },
+};
 
 function getKieKey(): string {
   const key = process.env.KIE_API_KEY;
@@ -111,16 +119,26 @@ export async function generateFirstFrame(params: {
       const sourceImageUrl = resultUrls[0];
       console.log("[image-gen] Kie AI image ready:", sourceImageUrl);
 
-      // Download and persist to Vercel Blob (Kie URLs expire after 24h)
+      // Download, resize to exact Sora dimensions, and persist to Vercel Blob
       const imageRes = await fetch(sourceImageUrl);
       if (!imageRes.ok) {
         throw new Error("Failed to download generated frame from Kie AI");
       }
 
-      const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
+      const rawBuffer = Buffer.from(await imageRes.arrayBuffer());
+      const targetSize = soraResolutionMap[params.aspectRatio] || soraResolutionMap["9:16"];
+
+      // Resize to exact Sora dimensions (720x1280 or 1280x720)
+      const resizedBuffer = await sharp(rawBuffer)
+        .resize(targetSize.width, targetSize.height, { fit: "cover" })
+        .png()
+        .toBuffer();
+
+      console.log("[image-gen] Resized frame to", targetSize.width, "x", targetSize.height);
+
       const blob = await put(
         `frames/${params.generationId}.png`,
-        imageBuffer,
+        resizedBuffer,
         { access: "public", contentType: "image/png" }
       );
 
