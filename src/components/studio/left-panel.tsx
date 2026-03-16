@@ -16,7 +16,7 @@ type Props = {
 };
 
 const ASPECT_RATIOS = ["9:16", "16:9", "720p"];
-const DURATIONS = [4, 8, 12, 16, 20];
+const DURATIONS = [4, 8, 12];
 
 export function LeftPanel({ state, dispatch, onGenerate, isGenerating }: Props) {
   const [archetypes, setArchetypes] = useState<Archetype[]>([]);
