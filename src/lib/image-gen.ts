@@ -1,22 +1,23 @@
 import { put } from "@vercel/blob";
 
-const OPENAI_API_BASE = "https://api.openai.com/v1";
+const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta";
 
-function getApiKey(): string {
-  const key = process.env.OPENAI_API_KEY;
-  if (!key) throw new Error("OPENAI_API_KEY is not set");
+function getGeminiKey(): string {
+  const key = process.env.GOOGLE_API_KEY;
+  if (!key) throw new Error("GOOGLE_API_KEY is not set");
   return key;
 }
 
-// Maps aspect ratio to the closest gpt-image-1 supported size
-const imageSizeMap: Record<string, string> = {
-  "9:16": "1024x1536",
-  "16:9": "1536x1024",
-  "720p": "1536x1024",
+// Maps aspect ratio to Gemini-supported aspect ratios
+const geminiAspectMap: Record<string, string> = {
+  "9:16": "9:16",
+  "16:9": "16:9",
+  "720p": "16:9",
 };
 
 /**
- * Generates a composed first frame using gpt-image-1.
+ * Generates a composed first frame using Gemini Nano Banana 2 Pro
+ * (gemini-3.1-flash-image-preview).
  * Takes the product image as visual reference and the scene description
  * to create a realistic first frame showing the character holding the product.
  * Returns the Vercel Blob URL of the generated frame.
@@ -36,64 +37,90 @@ export async function generateFirstFrame(params: {
   };
   generationId: string;
 }): Promise<string> {
-  // Build the image generation prompt
   const framePrompt = buildFramePrompt(params);
-  const size = imageSizeMap[params.aspectRatio] || "1024x1536";
+  const aspectRatio = geminiAspectMap[params.aspectRatio] || "9:16";
 
-  // Download the product image to send as reference
+  // Download the product image and convert to base64
   const productRes = await fetch(params.productImageUrl);
   if (!productRes.ok) {
     throw new Error("Failed to download product image for frame generation");
   }
-  const productBlob = await productRes.blob();
+  const productBuffer = Buffer.from(await productRes.arrayBuffer());
+  const productBase64 = productBuffer.toString("base64");
+  const mimeType = productRes.headers.get("content-type") || "image/png";
 
-  // Call gpt-image-1 with the product image as reference
-  const formData = new FormData();
-  formData.append("model", "gpt-image-1");
-  formData.append("prompt", framePrompt);
-  formData.append("size", size);
-  formData.append("quality", "high");
-  formData.append("image[]", productBlob, "product.png");
+  // Call Gemini Nano Banana 2 (gemini-3.1-flash-image-preview)
+  const model = "gemini-3.1-flash-image-preview";
+  const url = `${GEMINI_API_BASE}/models/${model}:generateContent?key=${getGeminiKey()}`;
 
-  const response = await fetch(`${OPENAI_API_BASE}/images/generations`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${getApiKey()}`,
+  const requestBody = {
+    contents: [
+      {
+        parts: [
+          { text: framePrompt },
+          {
+            inline_data: {
+              mime_type: mimeType,
+              data: productBase64,
+            },
+          },
+        ],
+      },
+    ],
+    generationConfig: {
+      responseModalities: ["IMAGE"],
+      imageConfig: {
+        aspectRatio,
+        imageSize: "1K",
+      },
     },
-    body: formData,
+  };
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(requestBody),
   });
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(
-      err?.error?.message || `Image generation error: ${response.status}`
-    );
+    const errMsg =
+      err?.error?.message ||
+      `Gemini image generation error: ${response.status}`;
+    throw new Error(errMsg);
   }
 
   const data = await response.json();
 
-  // gpt-image-1 returns base64 data
-  const imageData = data.data?.[0];
-  if (!imageData) {
-    throw new Error("No image returned from generation");
+  // Extract inline image data from response
+  const candidate = data.candidates?.[0];
+  if (!candidate) {
+    throw new Error("No candidates returned from Gemini image generation");
   }
 
-  // Handle both base64 and URL responses
-  let imageBuffer: Buffer;
-  if (imageData.b64_json) {
-    imageBuffer = Buffer.from(imageData.b64_json, "base64");
-  } else if (imageData.url) {
-    const imgRes = await fetch(imageData.url);
-    imageBuffer = Buffer.from(await imgRes.arrayBuffer());
-  } else {
-    throw new Error("Unexpected image response format");
+  let imageBase64: string | null = null;
+  let imageMime = "image/png";
+
+  for (const part of candidate.content?.parts || []) {
+    if (part.inline_data?.data) {
+      imageBase64 = part.inline_data.data;
+      imageMime = part.inline_data.mime_type || "image/png";
+      break;
+    }
   }
+
+  if (!imageBase64) {
+    throw new Error("No image data in Gemini response");
+  }
+
+  const imageBuffer = Buffer.from(imageBase64, "base64");
+  const ext = imageMime.includes("jpeg") ? "jpg" : "png";
 
   // Upload to Vercel Blob
   const blob = await put(
-    `frames/${params.generationId}.png`,
+    `frames/${params.generationId}.${ext}`,
     imageBuffer,
-    { access: "public", contentType: "image/png" }
+    { access: "public", contentType: imageMime }
   );
 
   return blob.url;
@@ -114,8 +141,12 @@ function buildFramePrompt(params: {
   const c = params.characterDetails;
   const parts: string[] = [];
 
-  parts.push("Generate a photorealistic photograph that looks like it was taken on an iPhone front camera (selfie mode).");
-  parts.push("The person in the photo is holding and showing the product from the reference image towards the camera.");
+  parts.push(
+    "Generate a photorealistic photograph that looks like it was taken on an iPhone front camera (selfie mode)."
+  );
+  parts.push(
+    "The person in the photo is holding and showing the product from the reference image towards the camera."
+  );
 
   // Character description
   const charParts: string[] = [];
@@ -132,17 +163,29 @@ function buildFramePrompt(params: {
   if (c.expression) parts.push(`Expression: ${c.expression}.`);
   if (c.clothing) parts.push(`Clothing: ${c.clothing}.`);
 
-  // Extract environment cues from scene description (first 200 chars for context)
+  // Extract environment cues from scene description
   const envSnippet = params.sceneDescription.slice(0, 300);
   parts.push(`Scene context: ${envSnippet}`);
 
   parts.push("CRITICAL RULES:");
-  parts.push("- The product must appear EXACTLY as shown in the reference image — same packaging, colors, branding, labels.");
-  parts.push("- The person is holding the product naturally in one hand, showing it to the camera.");
-  parts.push("- iPhone front camera perspective — slightly above eye level, arm's length distance.");
-  parts.push("- Natural skin texture with visible pores, no AI smoothing or beauty filters.");
-  parts.push("- Natural indoor or outdoor lighting, no studio lighting or professional color grading.");
-  parts.push("- The photo should look like a real person's selfie, not a stock photo or ad.");
+  parts.push(
+    "- The product must appear EXACTLY as shown in the reference image — same packaging, colors, branding, labels."
+  );
+  parts.push(
+    "- The person is holding the product naturally in one hand, showing it to the camera."
+  );
+  parts.push(
+    "- iPhone front camera perspective — slightly above eye level, arm's length distance."
+  );
+  parts.push(
+    "- Natural skin texture with visible pores, no AI smoothing or beauty filters."
+  );
+  parts.push(
+    "- Natural indoor or outdoor lighting, no studio lighting or professional color grading."
+  );
+  parts.push(
+    "- The photo should look like a real person's selfie, not a stock photo or ad."
+  );
 
   return parts.join("\n");
 }
