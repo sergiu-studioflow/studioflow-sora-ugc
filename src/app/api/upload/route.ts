@@ -32,9 +32,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ url: blob.url });
   } catch (err) {
-    console.error("[upload]", err);
+    const message = err instanceof Error ? err.message : "Upload failed";
+    console.error("[upload] Error:", message, err);
     return NextResponse.json(
-      { error: "Upload failed" },
+      { error: message },
       { status: 500 }
     );
   }

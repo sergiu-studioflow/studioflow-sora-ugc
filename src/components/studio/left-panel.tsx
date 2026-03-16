@@ -45,12 +45,13 @@ export function LeftPanel({ state, dispatch, onGenerate, isGenerating, onUploadi
       formData.append("file", file);
       const res = await fetch("/api/upload", { method: "POST", body: formData });
       const data = await res.json();
-      console.log("[upload] Response:", data);
+      console.log("[upload] Response:", JSON.stringify(data));
       if (data.url) {
         dispatch({ type: "SET_FIELD", field: "productImageUrl", value: data.url });
         console.log("[upload] productImageUrl set to:", data.url);
       } else {
-        console.error("[upload] No URL in response:", data);
+        console.error("[upload] No URL in response:", JSON.stringify(data));
+        alert(`Upload failed: ${data.error || "Unknown error"}`);
       }
     } catch (err) {
       console.error("[upload] Upload failed:", err);
