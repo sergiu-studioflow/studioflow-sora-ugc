@@ -3,6 +3,7 @@ import { requireAuth, isAuthError } from "@/lib/auth";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { submitSoraJob, pollSoraJob } from "@/lib/sora";
+import { put } from "@vercel/blob";
 import { eq, and } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
@@ -111,13 +112,28 @@ async function pollInBackground(generationId: string, jobId: string) {
       const result = await pollSoraJob(jobId);
 
       if (result.status === "completed" && result.videoUrl) {
-        // TODO: Download and persist to Vercel Blob for permanence
-        // For now, store the Sora URL directly
+        // Download video from OpenAI and persist to Vercel Blob
+        let finalVideoUrl = result.videoUrl;
+        try {
+          const videoRes = await fetch(result.videoUrl, {
+            headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+          });
+          if (videoRes.ok && videoRes.body) {
+            const blob = await put(`videos/${generationId}.mp4`, videoRes.body, {
+              access: "public",
+              contentType: "video/mp4",
+            });
+            finalVideoUrl = blob.url;
+          }
+        } catch {
+          // Fall back to direct URL if blob upload fails
+        }
+
         await db
           .update(schema.generations)
           .set({
             status: "video_ready",
-            videoUrl: result.videoUrl,
+            videoUrl: finalVideoUrl,
             updatedAt: new Date(),
           })
           .where(eq(schema.generations.id, generationId));
