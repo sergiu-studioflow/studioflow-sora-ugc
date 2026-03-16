@@ -2,12 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, isAuthError } from "@/lib/auth";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { submitSoraJob, pollSoraJob } from "@/lib/sora";
-import { put } from "@vercel/blob";
+import { submitSoraJob } from "@/lib/sora";
 import { eq, and } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 300; // 5 minutes for Vercel
 
 export async function POST(
   req: NextRequest,
@@ -74,9 +72,7 @@ export async function POST(
         .set({ soraJobId: jobId, updatedAt: new Date() })
         .where(eq(schema.generations.id, id));
 
-      // Start background polling
-      pollInBackground(id, jobId);
-
+      // Client-side polling via GET /api/generate/[id] handles status updates
       return NextResponse.json({ ok: true, jobId });
     } catch (soraErr) {
       await db
@@ -100,69 +96,4 @@ export async function POST(
       { status: 500 }
     );
   }
-}
-
-async function pollInBackground(generationId: string, jobId: string) {
-  const MAX_POLLS = 120; // 10 minutes at 5s intervals
-
-  for (let i = 0; i < MAX_POLLS; i++) {
-    await new Promise((r) => setTimeout(r, 5000));
-
-    try {
-      const result = await pollSoraJob(jobId);
-
-      if (result.status === "completed" && result.videoUrl) {
-        // Download video from OpenAI and persist to Vercel Blob
-        let finalVideoUrl = result.videoUrl;
-        try {
-          const videoRes = await fetch(result.videoUrl, {
-            headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-          });
-          if (videoRes.ok && videoRes.body) {
-            const blob = await put(`videos/${generationId}.mp4`, videoRes.body, {
-              access: "public",
-              contentType: "video/mp4",
-            });
-            finalVideoUrl = blob.url;
-          }
-        } catch {
-          // Fall back to direct URL if blob upload fails
-        }
-
-        await db
-          .update(schema.generations)
-          .set({
-            status: "video_ready",
-            videoUrl: finalVideoUrl,
-            updatedAt: new Date(),
-          })
-          .where(eq(schema.generations.id, generationId));
-        return;
-      }
-
-      if (result.status === "failed") {
-        await db
-          .update(schema.generations)
-          .set({
-            status: "error",
-            errorMessage: result.error || "Video generation failed",
-            updatedAt: new Date(),
-          })
-          .where(eq(schema.generations.id, generationId));
-        return;
-      }
-    } catch {
-      // Continue polling on transient errors
-    }
-  }
-
-  // Timeout
-  await db
-    .update(schema.generations)
-    .set({
-      status: "error",
-      errorMessage: "Generation timed out after 10 minutes",
-      updatedAt: new Date(),
-    })
-    .where(eq(schema.generations.id, generationId));
 }

@@ -77,12 +77,15 @@ export function RightPanel({ state }: Props) {
         {isCreatingVideo && (
           <div className="space-y-2">
             <p className="text-xs text-muted-foreground text-center">
-              Sora 2 Pro is creating your video...
+              Sora is creating your video... {state.progress > 0 ? `${state.progress}%` : ""}
             </p>
             <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-amber-400 to-amber-500 transition-all duration-1000 animate-pulse"
-                style={{ width: "70%" }}
+                className={cn(
+                  "h-full rounded-full bg-gradient-to-r from-amber-400 to-amber-500 transition-all duration-1000",
+                  state.progress === 0 && "animate-pulse"
+                )}
+                style={{ width: state.progress > 0 ? `${state.progress}%` : "15%" }}
               />
             </div>
           </div>

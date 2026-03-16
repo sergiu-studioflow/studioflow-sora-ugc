@@ -13,12 +13,13 @@ type Props = {
   dispatch: Dispatch<any>;
   onGenerate: () => void;
   isGenerating: boolean;
+  onUploadingChange?: (uploading: boolean) => void;
 };
 
 const ASPECT_RATIOS = ["9:16", "16:9", "720p"];
 const DURATIONS = [4, 8, 12];
 
-export function LeftPanel({ state, dispatch, onGenerate, isGenerating }: Props) {
+export function LeftPanel({ state, dispatch, onGenerate, isGenerating, onUploadingChange }: Props) {
   const [archetypes, setArchetypes] = useState<Archetype[]>([]);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -33,6 +34,7 @@ export function LeftPanel({ state, dispatch, onGenerate, isGenerating }: Props) 
   const handleImageUpload = async (file: File) => {
     if (!file.type.startsWith("image/")) return;
     setUploading(true);
+    onUploadingChange?.(true);
 
     // Client preview
     const preview = URL.createObjectURL(file);
@@ -50,6 +52,7 @@ export function LeftPanel({ state, dispatch, onGenerate, isGenerating }: Props) 
       // Keep preview even if upload fails
     } finally {
       setUploading(false);
+      onUploadingChange?.(false);
     }
   };
 
@@ -197,7 +200,7 @@ export function LeftPanel({ state, dispatch, onGenerate, isGenerating }: Props) 
         {/* Generate Script Button */}
         <Button
           onClick={onGenerate}
-          disabled={isGenerating || !state.creativeDirection.trim()}
+          disabled={isGenerating || uploading || !state.creativeDirection.trim()}
           className="w-full"
         >
           {isGenerating ? (

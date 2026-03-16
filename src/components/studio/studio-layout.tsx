@@ -32,6 +32,7 @@ export type StudioState = {
   estimatedCost: string;
   videoUrl: string;
   errorMessage: string;
+  progress: number;
 };
 
 export type Action =
@@ -64,6 +65,7 @@ const initialState: StudioState = {
   estimatedCost: "",
   videoUrl: "",
   errorMessage: "",
+  progress: 0,
 };
 
 function reducer(state: StudioState, action: Action): StudioState {
@@ -85,9 +87,10 @@ export function StudioLayout() {
   const [state, dispatch] = useReducer(reducer, initialState);
   const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
   const [isSendingToSora, setIsSendingToSora] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   const handleGenerateScript = useCallback(async () => {
-    if (!state.creativeDirection.trim()) return;
+    if (!state.creativeDirection.trim() || isUploading) return;
 
     setIsGeneratingPrompt(true);
     dispatch({ type: "SET_GENERATION", payload: { status: "generating_prompt", errorMessage: "" } });
@@ -142,7 +145,7 @@ export function StudioLayout() {
     } finally {
       setIsGeneratingPrompt(false);
     }
-  }, [state]);
+  }, [state, isUploading]);
 
   const handleSendToSora = useCallback(async () => {
     if (!state.generationId) return;
@@ -212,6 +215,15 @@ export function StudioLayout() {
           });
           return;
         }
+
+        // Update progress if available
+        if (data.progress !== undefined) {
+          dispatch({
+            type: "SET_FIELD",
+            field: "progress" as keyof StudioState,
+            value: data.progress,
+          });
+        }
       } catch {
         // Continue polling on network errors
       }
@@ -244,6 +256,7 @@ export function StudioLayout() {
           dispatch={dispatch}
           onGenerate={handleGenerateScript}
           isGenerating={isGeneratingPrompt}
+          onUploadingChange={setIsUploading}
         />
         <MiddlePanel
           state={state}
