@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Sora UGC Studio",
-  description: "AI-powered UGC video generation with Sora",
+  title: "AI UGC Studio",
+  description: "AI-powered UGC video generation",
 };
 
 export default function RootLayout({

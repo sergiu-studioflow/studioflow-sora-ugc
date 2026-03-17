@@ -1,6 +1,7 @@
 "use client";
 
 import { useReducer, useState, useCallback } from "react";
+import Image from "next/image";
 import { LeftPanel } from "./left-panel";
 import { MiddlePanel } from "./middle-panel";
 import { RightPanel } from "./right-panel";
@@ -131,10 +132,6 @@ export function StudioLayout() {
         payload: {
           generationId: data.id,
           status: "prompt_ready",
-          sceneDescription: data.sceneDescription || "",
-          dialogue: data.dialogue || "",
-          complianceNotes: data.complianceNotes || "",
-          negativePrompt: data.negativePrompt || "",
           fullPrompt: data.fullPrompt || "",
           estimatedCost: data.estimatedCost || "",
           referenceFrameUrl: data.referenceFrameUrl || "",
@@ -165,10 +162,7 @@ export function StudioLayout() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sceneDescription: state.sceneDescription,
-          dialogue: state.dialogue,
-          complianceNotes: state.complianceNotes,
-          negativePrompt: state.negativePrompt,
+          fullPrompt: state.fullPrompt,
         }),
       });
 
@@ -191,7 +185,7 @@ export function StudioLayout() {
     } finally {
       setIsSendingToSora(false);
     }
-  }, [state.generationId, state.sceneDescription, state.dialogue, state.complianceNotes, state.negativePrompt]);
+  }, [state.generationId, state.fullPrompt]);
 
   const pollForCompletion = useCallback(async (genId: string) => {
     const maxPolls = 120;
@@ -246,10 +240,14 @@ export function StudioLayout() {
       {/* Header */}
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-border px-6">
         <div className="flex items-center gap-2">
-          <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center">
-            <span className="text-xs font-bold text-primary-foreground">S</span>
-          </div>
-          <span className="text-sm font-semibold text-foreground">Sora UGC Studio</span>
+          <Image
+            src="/studioflow-logo.png"
+            alt="StudioFlow"
+            width={28}
+            height={28}
+            className="rounded-lg"
+          />
+          <span className="text-sm font-semibold text-foreground">AI UGC Studio</span>
         </div>
         <div className="text-xs text-muted-foreground">
           AI-Powered Video Generation
