@@ -7,6 +7,13 @@ import { MiddlePanel } from "./middle-panel";
 import { RightPanel } from "./right-panel";
 import type { GenerationStatus } from "@/lib/types";
 
+export type Scene = {
+  id: string;
+  duration: number;
+  type: string;
+  direction: string;
+};
+
 export type StudioState = {
   // Form inputs
   creativeDirection: string;
@@ -23,26 +30,27 @@ export type StudioState = {
   productImagePreview: string;
   aspectRatio: string;
   duration: number;
+  // Storyboard
+  storyboardMode: boolean;
+  scenes: Scene[];
   // Generation state
   generationId: string | null;
   status: GenerationStatus;
-  sceneDescription: string;
-  dialogue: string;
-  complianceNotes: string;
-  negativePrompt: string;
   fullPrompt: string;
   estimatedCost: string;
   videoUrl: string;
   errorMessage: string;
   progress: number;
-  referenceFrameUrl: string;
-  frameError: string;
 };
 
 export type Action =
-  | { type: "SET_FIELD"; field: keyof StudioState; value: string | number }
+  | { type: "SET_FIELD"; field: keyof StudioState; value: string | number | boolean }
   | { type: "SET_ARCHETYPE"; payload: Partial<StudioState> }
   | { type: "SET_GENERATION"; payload: Partial<StudioState> }
+  | { type: "TOGGLE_STORYBOARD"; enabled: boolean }
+  | { type: "ADD_SCENE" }
+  | { type: "UPDATE_SCENE"; sceneId: string; field: keyof Scene; value: string | number }
+  | { type: "REMOVE_SCENE"; sceneId: string }
   | { type: "RESET" };
 
 const initialState: StudioState = {
@@ -60,20 +68,20 @@ const initialState: StudioState = {
   productImagePreview: "",
   aspectRatio: "9:16",
   duration: 8,
+  storyboardMode: false,
+  scenes: [],
   generationId: null,
   status: "draft",
-  sceneDescription: "",
-  dialogue: "",
-  complianceNotes: "",
-  negativePrompt: "",
   fullPrompt: "",
   estimatedCost: "",
   videoUrl: "",
   errorMessage: "",
   progress: 0,
-  referenceFrameUrl: "",
-  frameError: "",
 };
+
+function getAllocatedDuration(scenes: Scene[]): number {
+  return scenes.reduce((sum, s) => sum + s.duration, 0);
+}
 
 function reducer(state: StudioState, action: Action): StudioState {
   switch (action.type) {
@@ -83,6 +91,36 @@ function reducer(state: StudioState, action: Action): StudioState {
       return { ...state, ...action.payload };
     case "SET_GENERATION":
       return { ...state, ...action.payload };
+    case "TOGGLE_STORYBOARD":
+      return {
+        ...state,
+        storyboardMode: action.enabled,
+        scenes: action.enabled ? state.scenes : [],
+      };
+    case "ADD_SCENE": {
+      const allocated = getAllocatedDuration(state.scenes);
+      const remaining = state.duration - allocated;
+      if (remaining < 3) return state;
+      const newScene: Scene = {
+        id: crypto.randomUUID(),
+        duration: Math.min(remaining, 4),
+        type: "talking-head",
+        direction: "",
+      };
+      return { ...state, scenes: [...state.scenes, newScene] };
+    }
+    case "UPDATE_SCENE":
+      return {
+        ...state,
+        scenes: state.scenes.map((s) =>
+          s.id === action.sceneId ? { ...s, [action.field]: action.value } : s
+        ),
+      };
+    case "REMOVE_SCENE":
+      return {
+        ...state,
+        scenes: state.scenes.filter((s) => s.id !== action.sceneId),
+      };
     case "RESET":
       return { ...initialState };
     default:
@@ -97,9 +135,18 @@ export function StudioLayout() {
   const [isUploading, setIsUploading] = useState(false);
 
   const handleGenerateScript = useCallback(async () => {
-    if (!state.creativeDirection.trim() || isUploading) return;
+    if (isUploading) return;
 
-    console.log("[studio] Generating with productImageUrl:", state.productImageUrl || "(empty)");
+    // Validate based on mode
+    if (state.storyboardMode) {
+      if (state.scenes.length === 0) return;
+      const allocated = getAllocatedDuration(state.scenes);
+      if (allocated !== state.duration) return;
+      if (state.scenes.some((s) => !s.direction.trim())) return;
+    } else {
+      if (!state.creativeDirection.trim()) return;
+    }
+
     setIsGeneratingPrompt(true);
     dispatch({ type: "SET_GENERATION", payload: { status: "generating_prompt", errorMessage: "" } });
 
@@ -121,6 +168,10 @@ export function StudioLayout() {
           aspectRatio: state.aspectRatio,
           duration: state.duration,
           archetypeId: state.archetypeId || undefined,
+          storyboardMode: state.storyboardMode,
+          scenes: state.storyboardMode
+            ? state.scenes.map((s) => ({ duration: s.duration, type: s.type, direction: s.direction }))
+            : undefined,
         }),
       });
 
@@ -137,8 +188,6 @@ export function StudioLayout() {
           status: "prompt_ready",
           fullPrompt: data.fullPrompt || "",
           estimatedCost: data.estimatedCost || "",
-          referenceFrameUrl: data.referenceFrameUrl || "",
-          frameError: data.frameError || "",
         },
       });
     } catch (err) {
@@ -175,7 +224,6 @@ export function StudioLayout() {
         throw new Error(data.error || "Failed to send to Sora");
       }
 
-      // Start polling for status updates
       pollForCompletion(state.generationId);
     } catch (err) {
       dispatch({
@@ -201,10 +249,7 @@ export function StudioLayout() {
         if (data.status === "video_ready") {
           dispatch({
             type: "SET_GENERATION",
-            payload: {
-              status: "video_ready",
-              videoUrl: data.videoUrl || "",
-            },
+            payload: { status: "video_ready", videoUrl: data.videoUrl || "" },
           });
           return;
         }
@@ -212,21 +257,13 @@ export function StudioLayout() {
         if (data.status === "error") {
           dispatch({
             type: "SET_GENERATION",
-            payload: {
-              status: "error",
-              errorMessage: data.errorMessage || "Video generation failed",
-            },
+            payload: { status: "error", errorMessage: data.errorMessage || "Video generation failed" },
           });
           return;
         }
 
-        // Update progress if available
         if (data.progress !== undefined) {
-          dispatch({
-            type: "SET_FIELD",
-            field: "progress" as keyof StudioState,
-            value: data.progress,
-          });
+          dispatch({ type: "SET_FIELD", field: "progress", value: data.progress });
         }
       } catch {
         // Continue polling on network errors
@@ -240,7 +277,6 @@ export function StudioLayout() {
 
   return (
     <div className="flex h-screen flex-col bg-background">
-      {/* Header */}
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-border px-6">
         <div className="flex items-center gap-2">
           <Image
@@ -257,7 +293,6 @@ export function StudioLayout() {
         </div>
       </header>
 
-      {/* 3-Panel Grid */}
       <div className="grid flex-1 grid-cols-[320px_1fr_380px] overflow-hidden">
         <LeftPanel
           state={state}

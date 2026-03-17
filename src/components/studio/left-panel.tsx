@@ -2,11 +2,12 @@
 
 import { useEffect, useState, type Dispatch } from "react";
 import { upload } from "@vercel/blob/client";
-import { Upload as UploadIcon, Sparkles, Shuffle, X } from "lucide-react";
+import { Upload as UploadIcon, Sparkles, Shuffle, X, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { Archetype } from "@/lib/types";
+import type { Scene } from "./studio-layout";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -18,7 +19,14 @@ type Props = {
 };
 
 const ASPECT_RATIOS = ["9:16", "16:9", "720p"];
-const DURATIONS = [4, 8, 12];
+const DURATIONS = [4, 8, 12, 16, 20];
+
+const SCENE_TYPES = [
+  { value: "talking-head", label: "Talking Head" },
+  { value: "b-roll", label: "B-Roll" },
+  { value: "product-closeup", label: "Product Close-up" },
+  { value: "transition", label: "Transition" },
+];
 
 export function LeftPanel({ state, dispatch, onGenerate, isGenerating, onUploadingChange }: Props) {
   const [archetypes, setArchetypes] = useState<Archetype[]>([]);
@@ -37,21 +45,17 @@ export function LeftPanel({ state, dispatch, onGenerate, isGenerating, onUploadi
     setUploading(true);
     onUploadingChange?.(true);
 
-    // Client preview
     const preview = URL.createObjectURL(file);
     dispatch({ type: "SET_FIELD", field: "productImagePreview", value: preview });
 
     try {
-      // Client-side upload directly to Vercel Blob (bypasses 4.5MB serverless limit)
       const blob = await upload(`references/${file.name}`, file, {
         access: "public",
         handleUploadUrl: "/api/upload",
       });
-      console.log("[upload] Blob uploaded:", blob.url);
       dispatch({ type: "SET_FIELD", field: "productImageUrl", value: blob.url });
     } catch (err) {
       console.error("[upload] Upload failed:", err);
-      alert(`Upload error: ${err instanceof Error ? err.message : "Unknown"}`);
     } finally {
       setUploading(false);
       onUploadingChange?.(false);
@@ -83,9 +87,18 @@ export function LeftPanel({ state, dispatch, onGenerate, isGenerating, onUploadi
     });
   };
 
-  const setField = (field: string, value: string | number) => {
+  const setField = (field: string, value: string | number | boolean) => {
     dispatch({ type: "SET_FIELD", field, value });
   };
+
+  // Storyboard helpers
+  const scenes: Scene[] = state.scenes || [];
+  const allocatedDuration = scenes.reduce((sum: number, s: Scene) => sum + s.duration, 0);
+  const remainingDuration = state.duration - allocatedDuration;
+  const canAddScene = remainingDuration >= 3;
+  const scenesValid = state.storyboardMode
+    ? scenes.length > 0 && allocatedDuration === state.duration && scenes.every((s: Scene) => s.direction.trim())
+    : state.creativeDirection.trim();
 
   return (
     <div className="flex flex-col border-r border-border overflow-y-auto">
@@ -96,18 +109,142 @@ export function LeftPanel({ state, dispatch, onGenerate, isGenerating, onUploadi
           <h2 className="text-sm font-semibold text-foreground">Input</h2>
         </div>
 
-        {/* Creative Direction */}
+        {/* Mode Toggle */}
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            Creative Direction
+            Mode
           </label>
-          <Textarea
-            placeholder="Describe the video you want... e.g. 'Busy mum showing teeth whitening product, warm and genuine feeling'"
-            value={state.creativeDirection}
-            onChange={(e) => setField("creativeDirection", e.target.value)}
-            className="min-h-[80px] text-sm resize-none"
-          />
+          <div className="flex gap-2">
+            {[
+              { value: false, label: "Simple" },
+              { value: true, label: "Storyboard" },
+            ].map(({ value, label }) => (
+              <button
+                key={label}
+                onClick={() => dispatch({ type: "TOGGLE_STORYBOARD", enabled: value })}
+                className={cn(
+                  "flex-1 rounded-lg border py-1.5 text-xs font-medium transition-all",
+                  state.storyboardMode === value
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border text-muted-foreground hover:border-foreground/30"
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
+
+        {/* Creative Direction OR Storyboard */}
+        {!state.storyboardMode ? (
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              Creative Direction
+            </label>
+            <Textarea
+              placeholder="Describe the video you want... e.g. 'Busy mum showing teeth whitening product, warm and genuine feeling'"
+              value={state.creativeDirection}
+              onChange={(e) => setField("creativeDirection", e.target.value)}
+              className="min-h-[80px] text-sm resize-none"
+            />
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Storyboard
+              </label>
+              <div className="flex items-center gap-2 text-[11px]">
+                <span className="text-muted-foreground">
+                  {allocatedDuration}s / {state.duration}s
+                </span>
+                {remainingDuration > 0 && (
+                  <span className="text-yellow-500">{remainingDuration}s remaining</span>
+                )}
+                {remainingDuration === 0 && allocatedDuration === state.duration && (
+                  <span className="text-green-500">Complete</span>
+                )}
+              </div>
+            </div>
+
+            {/* Scene Cards */}
+            <div className="space-y-3">
+              {scenes.map((scene: Scene, index: number) => (
+                <div key={scene.id} className="rounded-lg border border-border bg-card p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-foreground">Scene {index + 1}</span>
+                    <button
+                      onClick={() => dispatch({ type: "REMOVE_SCENE", sceneId: scene.id })}
+                      className="p-0.5 rounded hover:bg-destructive/10"
+                    >
+                      <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+                    </button>
+                  </div>
+
+                  {/* Duration */}
+                  <div className="flex items-center gap-2">
+                    <label className="text-[11px] text-muted-foreground w-14 shrink-0">Duration</label>
+                    <select
+                      value={scene.duration}
+                      onChange={(e) =>
+                        dispatch({ type: "UPDATE_SCENE", sceneId: scene.id, field: "duration", value: Number(e.target.value) })
+                      }
+                      className="text-xs bg-background border border-border rounded-md px-2 py-1 text-foreground flex-1"
+                    >
+                      {Array.from({ length: 18 }, (_, i) => i + 3)
+                        .filter((d) => d <= scene.duration + remainingDuration)
+                        .map((d) => (
+                          <option key={d} value={d}>{d}s</option>
+                        ))}
+                    </select>
+                  </div>
+
+                  {/* Type */}
+                  <div className="flex flex-wrap gap-1">
+                    {SCENE_TYPES.map(({ value, label }) => (
+                      <button
+                        key={value}
+                        onClick={() =>
+                          dispatch({ type: "UPDATE_SCENE", sceneId: scene.id, field: "type", value })
+                        }
+                        className={cn(
+                          "rounded-md border px-2 py-0.5 text-[10px] font-medium transition-all",
+                          scene.type === value
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border text-muted-foreground hover:border-foreground/30"
+                        )}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Direction */}
+                  <Textarea
+                    placeholder={`What happens in scene ${index + 1}?`}
+                    value={scene.direction}
+                    onChange={(e) =>
+                      dispatch({ type: "UPDATE_SCENE", sceneId: scene.id, field: "direction", value: e.target.value })
+                    }
+                    className="text-xs min-h-[60px] resize-none"
+                  />
+                </div>
+              ))}
+            </div>
+
+            {/* Add Scene Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => dispatch({ type: "ADD_SCENE" })}
+              disabled={!canAddScene}
+              className="w-full text-xs"
+            >
+              <Plus className="h-3 w-3 mr-1.5" />
+              Add Scene {!canAddScene && remainingDuration > 0 ? `(need ${3 - remainingDuration}s more)` : ""}
+            </Button>
+          </div>
+        )}
 
         {/* Character Section */}
         <div className="space-y-3">
@@ -243,11 +380,6 @@ export function LeftPanel({ state, dispatch, onGenerate, isGenerating, onUploadi
                   Uploaded
                 </div>
               )}
-              {!uploading && !state.productImageUrl && state.productImagePreview && (
-                <div className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-red-600/80 text-[10px] text-white">
-                  Upload failed
-                </div>
-              )}
             </div>
           ) : (
             <div
@@ -335,7 +467,7 @@ export function LeftPanel({ state, dispatch, onGenerate, isGenerating, onUploadi
         {/* Generate Script Button */}
         <Button
           onClick={onGenerate}
-          disabled={isGenerating || uploading || !state.creativeDirection.trim()}
+          disabled={isGenerating || uploading || !scenesValid}
           className="w-full"
         >
           {isGenerating ? (

@@ -48,9 +48,8 @@ export async function POST(
 
     // Submit to Sora
     try {
-      // Prefer the AI-generated first frame over the raw product image
-      const referenceImageUrl =
-        generation.thumbnailUrl || generation.productImageUrl || undefined;
+      // Pass the product reference image directly to Sora
+      const referenceImageUrl = generation.productImageUrl || undefined;
 
       const { jobId } = await submitSoraJob({
         prompt: fullPrompt,

@@ -108,9 +108,6 @@ Compliance Notes
 
 [Include relevant compliance notes — no medical/financial outcome guarantees, no exaggerated promises. Use language like "consistent use", "gradual results", "I noticed", "helped me".]
 
-===FRAME_METADATA===
-{"frameDescription": "[1-2 sentence summary of: environment + character appearance + product placement — used for AI first-frame generation, NOT sent to Sora]"}
-
 ---
 
 ## Section Rules
@@ -136,7 +133,19 @@ Compliance Notes
 - Include specific physical actions (picks up jar, tilts toward camera, gestures)
 - Specify camera perspective changes between scenes (front camera vs back camera B-roll)
 
-### 15-Second Script Rules
+### Storyboard Mode
+- If the user provides a "Storyboard" with defined scenes (each with duration, type, and creative direction), you MUST follow their exact scene breakdown
+- Use the exact durations, types, and creative direction from each scene
+- Do NOT add, remove, or reorder scenes — follow the user's structure precisely
+- Scene types guide the camera and composition:
+  * "Talking Head" → front camera, person speaking directly to camera, conversational
+  * "B-Roll" → back camera or handheld, product/environment footage, voiceover
+  * "Product Close-up" → tight shot of the product, handheld back camera, slow movement around the product
+  * "Transition" → brief visual bridge between scenes, quick cut or camera movement
+- Still apply all visual realism rules, product accuracy, and compliance within each scene
+- Generate dialogue/voiceover for each scene that matches the user's creative direction
+
+### Script Rules
 - Duration must match the user's requested video length when spoken naturally
 - Include natural speech cadence: pauses ("..."), filler sounds ("like", "honestly", "literally"), conversational rhythm
 - Must sound like a real person talking to their phone camera, NOT a scripted ad
@@ -175,12 +184,5 @@ Compliance Notes
 - Use language like: "consistent use", "gradual results", "I noticed", "helped me"
 - If the product category has specific regulatory requirements, note them
 
-### Frame Metadata
-- The frameDescription in the metadata block is for the AI first-frame generator, NOT for Sora
-- It describes the OPENING FRAME of Scene 1 — before the person picks up the product
-- It MUST include: the environment, the character's appearance/pose, and the product resting on a surface in front of them
-- The product must be described as sitting on a counter/table — NOT held in the person's hands (the video starts with the product on the surface, they pick it up later)
-- Example: "A 22-year-old woman with loose brown hair in a messy bun sits at a white marble kitchen island in a modern apartment, natural daylight from a window, wearing a beige cardigan over a white top. The MySweetSmile Teeth Whitening Powder jar sits on the marble counter in front of her."
-
-IMPORTANT: Output the structured prompt directly. No JSON wrapping. No markdown code blocks. No explanations or commentary before or after the prompt. The only special marker is the ===FRAME_METADATA=== delimiter at the very end.`;
+IMPORTANT: Output the structured prompt directly. No JSON wrapping. No markdown code blocks. No explanations or commentary before or after the prompt.`;
 }

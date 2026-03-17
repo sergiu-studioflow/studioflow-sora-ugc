@@ -28,7 +28,9 @@ export type SoraPollResult = {
 function clampDuration(d: number): string {
   if (d <= 4) return "4";
   if (d <= 8) return "8";
-  return "12";
+  if (d <= 12) return "12";
+  if (d <= 16) return "16";
+  return "20";
 }
 
 export async function submitSoraJob(params: {

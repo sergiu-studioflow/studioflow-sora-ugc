@@ -3,7 +3,6 @@ import { requireAuth, isAuthError } from "@/lib/auth";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { generateSoraPrompt } from "@/lib/claude";
-import { generateFirstFrame } from "@/lib/image-gen";
 import { estimateCost } from "@/lib/sora";
 import { eq } from "drizzle-orm";
 
@@ -29,20 +28,24 @@ export async function POST(req: NextRequest) {
       aspectRatio = "9:16",
       duration = 8,
       archetypeId,
+      storyboardMode = false,
+      scenes,
     } = body;
 
-    if (!creativeDirection?.trim()) {
+    if (!storyboardMode && !creativeDirection?.trim()) {
       return NextResponse.json({ error: "Creative direction is required" }, { status: 400 });
     }
 
-    console.log("[generate] productImageUrl received:", productImageUrl || "(empty)");
+    if (storyboardMode && (!scenes || scenes.length === 0)) {
+      return NextResponse.json({ error: "At least one scene is required in storyboard mode" }, { status: 400 });
+    }
 
     // Create generation record
     const [generation] = await db
       .insert(schema.generations)
       .values({
         userId: authResult.portalUser.id,
-        creativeDirection,
+        creativeDirection: storyboardMode ? `[Storyboard: ${scenes.length} scenes]` : creativeDirection,
         ageRange,
         gender,
         characterDescription: profile,
@@ -58,7 +61,7 @@ export async function POST(req: NextRequest) {
       })
       .returning();
 
-    // Look up archetype name if selected (pass to Claude as creative concept)
+    // Look up archetype name if selected
     let archetypeName: string | undefined;
     if (archetypeId) {
       const [arch] = await db
@@ -71,7 +74,7 @@ export async function POST(req: NextRequest) {
 
     // Call Claude to generate structured prompt
     const promptResult = await generateSoraPrompt({
-      creativeDirection,
+      creativeDirection: creativeDirection || "",
       ageRange,
       gender,
       profile,
@@ -81,54 +84,20 @@ export async function POST(req: NextRequest) {
       clothing,
       emotionalTone,
       archetypeName,
+      storyboardMode,
+      scenes,
       duration,
       aspectRatio,
     });
 
     const cost = estimateCost(duration);
 
-    // Generate composed first frame if product image was uploaded
-    let referenceFrameUrl: string | null = null;
-    let frameError: string | null = null;
-    if (productImageUrl) {
-      console.log("[generate] Starting Gemini first frame generation for:", generation.id);
-      try {
-        referenceFrameUrl = await generateFirstFrame({
-          productImageUrl,
-          sceneDescription: promptResult.frameDescription,
-          aspectRatio,
-          characterDetails: {
-            ageRange,
-            gender,
-            profile,
-            makeup,
-            expression,
-            hair,
-            clothing,
-          },
-          generationId: generation.id,
-        });
-        console.log("[generate] First frame generated:", referenceFrameUrl);
-      } catch (frameErr) {
-        frameError = frameErr instanceof Error ? frameErr.message : "Unknown frame generation error";
-        console.error("[generate] First frame generation failed:", frameError);
-        // Non-fatal — continue without the composed frame
-      }
-    } else {
-      console.log("[generate] No productImageUrl provided, skipping frame generation");
-    }
-
-    // Update generation with Claude output + frame
+    // Update generation with Claude output
     const [updated] = await db
       .update(schema.generations)
       .set({
-        sceneDescription: promptResult.frameDescription,
-        dialogue: "",
-        complianceNotes: "",
-        negativePrompt: "",
         fullPrompt: promptResult.fullPrompt,
         estimatedCost: cost,
-        thumbnailUrl: referenceFrameUrl,
         status: "prompt_ready",
         updatedAt: new Date(),
       })
@@ -139,8 +108,6 @@ export async function POST(req: NextRequest) {
       id: updated.id,
       fullPrompt: updated.fullPrompt,
       estimatedCost: updated.estimatedCost,
-      referenceFrameUrl: updated.thumbnailUrl,
-      frameError,
       status: updated.status,
     });
   } catch (err) {

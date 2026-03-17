@@ -7,7 +7,12 @@ function getClient() {
 
 export type PromptResult = {
   fullPrompt: string;
-  frameDescription: string;
+};
+
+export type StoryboardScene = {
+  duration: number;
+  type: string;
+  direction: string;
 };
 
 export async function generateSoraPrompt(input: {
@@ -22,6 +27,8 @@ export async function generateSoraPrompt(input: {
   emotionalTone?: string;
   archetypeName?: string;
   productDescription?: string;
+  storyboardMode?: boolean;
+  scenes?: StoryboardScene[];
   duration: number;
   aspectRatio: string;
 }): Promise<PromptResult> {
@@ -40,7 +47,7 @@ export async function generateSoraPrompt(input: {
     .map((block) => block.text)
     .join("");
 
-  return parsePromptResponse(text);
+  return { fullPrompt: text.trim() };
 }
 
 function buildUserMessage(input: {
@@ -55,12 +62,28 @@ function buildUserMessage(input: {
   emotionalTone?: string;
   archetypeName?: string;
   productDescription?: string;
+  storyboardMode?: boolean;
+  scenes?: StoryboardScene[];
   duration: number;
   aspectRatio: string;
 }): string {
   const parts: string[] = [];
 
-  parts.push(`## Creative Direction\n${input.creativeDirection}`);
+  // Storyboard mode: structured scene breakdown replaces single creative direction
+  if (input.storyboardMode && input.scenes && input.scenes.length > 0) {
+    parts.push(`## Storyboard (User-Defined Scene Breakdown)\nThe user has defined the exact scene structure. Follow this breakdown precisely — use the exact durations, types, and creative direction for each scene. Do NOT add, remove, or reorder scenes.`);
+
+    let cumulativeTime = 0;
+    input.scenes.forEach((scene, i) => {
+      const startTime = cumulativeTime;
+      const endTime = cumulativeTime + scene.duration;
+      const typeLabel = scene.type.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+      parts.push(`### Scene ${i + 1} (${startTime}–${endTime}s) — ${typeLabel}\n${scene.direction}`);
+      cumulativeTime = endTime;
+    });
+  } else {
+    parts.push(`## Creative Direction\n${input.creativeDirection}`);
+  }
 
   if (input.emotionalTone) {
     parts.push(`## Emotional Tone\n${input.emotionalTone}`);
@@ -95,68 +118,4 @@ function buildUserMessage(input: {
   parts.push(`- Style: authentic UGC phone video`);
 
   return parts.join("\n\n");
-}
-
-const METADATA_DELIMITER = "===FRAME_METADATA===";
-
-function parsePromptResponse(text: string): PromptResult {
-  const delimiterIndex = text.indexOf(METADATA_DELIMITER);
-
-  if (delimiterIndex !== -1) {
-    const fullPrompt = text.slice(0, delimiterIndex).trim();
-    const metadataText = text.slice(delimiterIndex + METADATA_DELIMITER.length).trim();
-
-    let frameDescription = "";
-    try {
-      const metadata = JSON.parse(metadataText);
-      frameDescription = metadata.frameDescription || "";
-    } catch {
-      // Try to extract JSON object from the metadata section
-      const jsonMatch = metadataText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        try {
-          const metadata = JSON.parse(jsonMatch[0]);
-          frameDescription = metadata.frameDescription || "";
-        } catch {
-          // Fall through to extraction
-        }
-      }
-    }
-
-    // Fallback: extract from the prompt text itself
-    if (!frameDescription) {
-      frameDescription = extractFrameDescription(fullPrompt);
-    }
-
-    return { fullPrompt, frameDescription };
-  }
-
-  // No delimiter found — use entire text as prompt, extract frame description
-  const fullPrompt = text.trim();
-  const frameDescription = extractFrameDescription(fullPrompt);
-
-  return { fullPrompt, frameDescription };
-}
-
-/**
- * Extracts a frame description from the structured prompt text
- * by finding the Environment and Character sections.
- */
-function extractFrameDescription(promptText: string): string {
-  const parts: string[] = [];
-
-  // Extract Character line (first line after "Character" heading)
-  const charMatch = promptText.match(/^Character\n+(.+)/m);
-  if (charMatch) parts.push(charMatch[1].trim());
-
-  // Extract Environment line (first line after "Environment" heading)
-  const envMatch = promptText.match(/^Environment\n+(.+)/m);
-  if (envMatch) parts.push(envMatch[1].trim());
-
-  if (parts.length > 0) {
-    return parts.join(". ") + ".";
-  }
-
-  // Last resort: use first 200 chars
-  return promptText.slice(0, 200);
 }
