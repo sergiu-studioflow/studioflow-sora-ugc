@@ -7,6 +7,7 @@ import { estimateCost } from "@/lib/sora";
 import { eq } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 120; // 2 minutes for Claude prompt generation
 
 export async function POST(req: NextRequest) {
   try {

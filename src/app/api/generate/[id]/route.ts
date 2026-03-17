@@ -7,6 +7,7 @@ import { put } from "@vercel/blob";
 import { eq, and } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 120; // 2 minutes for video download + blob upload
 
 export async function GET(
   req: NextRequest,

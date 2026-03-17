@@ -239,7 +239,7 @@ export function StudioLayout() {
   }, [state.generationId, state.fullPrompt]);
 
   const pollForCompletion = useCallback(async (genId: string) => {
-    const maxPolls = 120;
+    const maxPolls = 300; // 300 polls × 3s = 15 minutes (Sora Pro 1080p can be slow)
     for (let i = 0; i < maxPolls; i++) {
       await new Promise((r) => setTimeout(r, 3000));
       try {

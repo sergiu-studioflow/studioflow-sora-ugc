@@ -7,6 +7,7 @@ import { resizeForSora } from "@/lib/resize-image";
 import { eq, and } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 120; // 2 minutes for resize + Sora submission
 
 export async function POST(
   req: NextRequest,
