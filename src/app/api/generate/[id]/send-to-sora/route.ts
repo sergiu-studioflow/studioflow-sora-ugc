@@ -3,6 +3,7 @@ import { requireAuth, isAuthError } from "@/lib/auth";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { submitSoraJob } from "@/lib/sora";
+import { resizeForSora } from "@/lib/resize-image";
 import { eq, and } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
@@ -48,8 +49,20 @@ export async function POST(
 
     // Submit to Sora
     try {
-      // Pass the product reference image directly to Sora
-      const referenceImageUrl = generation.productImageUrl || undefined;
+      // Resize product image to exact Sora dimensions before submitting
+      let referenceImageUrl: string | undefined;
+      if (generation.productImageUrl) {
+        try {
+          referenceImageUrl = await resizeForSora(
+            generation.productImageUrl,
+            generation.aspectRatio,
+            id
+          );
+          console.log("[send-to-sora] Resized reference image:", referenceImageUrl);
+        } catch (resizeErr) {
+          console.error("[send-to-sora] Resize failed, sending without reference:", resizeErr);
+        }
+      }
 
       const { jobId } = await submitSoraJob({
         prompt: fullPrompt,
