@@ -174,11 +174,12 @@ function buildFramePrompt(params: {
   const c = params.characterDetails;
   const parts: string[] = [];
 
+  // Core composition — matches Scene 1 of the Sora video prompt
   parts.push(
     "Generate a photorealistic photograph that looks like it was taken on an iPhone front camera (selfie mode)."
   );
   parts.push(
-    "The person in the photo is holding and showing the product from the reference image towards the camera."
+    "This is the OPENING FRAME of a UGC-style video. The person is sitting or standing at a counter/table, looking directly at the camera with a natural expression. The product from the reference image sits on the surface in front of them — NOT held in their hands. The product is clearly visible on the counter at its natural size."
   );
 
   // Character description
@@ -196,16 +197,22 @@ function buildFramePrompt(params: {
   if (c.expression) parts.push(`Expression: ${c.expression}.`);
   if (c.clothing) parts.push(`Clothing: ${c.clothing}.`);
 
-  // Extract environment cues from scene description
-  const envSnippet = params.sceneDescription.slice(0, 300);
-  parts.push(`Scene context: ${envSnippet}`);
+  // Use Claude's frame description as the primary scene context
+  // This already describes environment + product placement from the Sora prompt
+  parts.push(`Scene description: ${params.sceneDescription}`);
 
-  parts.push("CRITICAL RULES:");
+  parts.push("COMPOSITION RULES:");
   parts.push(
-    "- The product must appear EXACTLY as shown in the reference image — same packaging, colors, branding, labels."
+    "- The product sits upright on the counter/table surface in the lower-third of the frame, at its real-world size."
   );
   parts.push(
-    "- The person is holding the product naturally in one hand, showing it to the camera."
+    "- The person is framed from mid-chest up, centered, with both hands resting naturally (on the counter, on their lap, or one hand near the product without gripping it)."
+  );
+  parts.push(
+    "- The product must appear EXACTLY as shown in the reference image — same packaging, colors, branding, label text, proportions."
+  );
+  parts.push(
+    "- Do NOT place the product in the person's hand, raised in the air, or floating. It must rest on a surface."
   );
   parts.push(
     "- iPhone front camera perspective — slightly above eye level, arm's length distance."
@@ -214,10 +221,10 @@ function buildFramePrompt(params: {
     "- Natural skin texture with visible pores, no AI smoothing or beauty filters."
   );
   parts.push(
-    "- Natural indoor or outdoor lighting, no studio lighting or professional color grading."
+    "- Natural indoor lighting, no studio lighting or professional color grading."
   );
   parts.push(
-    "- The photo should look like a real person's selfie, not a stock photo or ad."
+    "- The photo should look like the first frame of someone about to start talking to their phone camera — casual, authentic, not posed."
   );
 
   return parts.join("\n");

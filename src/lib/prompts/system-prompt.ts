@@ -131,7 +131,8 @@ Compliance Notes
 - Each scene must have BOTH visual direction AND dialogue
 - Dialogue is embedded within scenes, not separated
 - First scene MUST open with a strong hook
-- Product must be visible or referenced from the very beginning
+- Product must be visible on a surface (counter, table, desk) from the very first frame — NOT held in the person's hands at the start
+- The person picks up or gestures toward the product DURING the scene, not before it begins
 - Include specific physical actions (picks up jar, tilts toward camera, gestures)
 - Specify camera perspective changes between scenes (front camera vs back camera B-roll)
 
@@ -176,8 +177,10 @@ Compliance Notes
 
 ### Frame Metadata
 - The frameDescription in the metadata block is for the AI first-frame generator, NOT for Sora
-- It should be a concise 1-2 sentence description of: the environment, the character's appearance, and where the product is placed
-- Example: "A 22-year-old woman with loose brown hair sits at a white marble kitchen island in a modern apartment, natural daylight from a window. A frosted blue skincare jar sits on the counter in front of her."
+- It describes the OPENING FRAME of Scene 1 — before the person picks up the product
+- It MUST include: the environment, the character's appearance/pose, and the product resting on a surface in front of them
+- The product must be described as sitting on a counter/table — NOT held in the person's hands (the video starts with the product on the surface, they pick it up later)
+- Example: "A 22-year-old woman with loose brown hair in a messy bun sits at a white marble kitchen island in a modern apartment, natural daylight from a window, wearing a beige cardigan over a white top. The MySweetSmile Teeth Whitening Powder jar sits on the marble counter in front of her."
 
 IMPORTANT: Output the structured prompt directly. No JSON wrapping. No markdown code blocks. No explanations or commentary before or after the prompt. The only special marker is the ===FRAME_METADATA=== delimiter at the very end.`;
 }
