@@ -19,6 +19,8 @@ export async function generateSoraPrompt(input: {
   expression?: string;
   hair?: string;
   clothing?: string;
+  emotionalTone?: string;
+  archetypeName?: string;
   productDescription?: string;
   duration: number;
   aspectRatio: string;
@@ -50,6 +52,8 @@ function buildUserMessage(input: {
   expression?: string;
   hair?: string;
   clothing?: string;
+  emotionalTone?: string;
+  archetypeName?: string;
   productDescription?: string;
   duration: number;
   aspectRatio: string;
@@ -57,6 +61,14 @@ function buildUserMessage(input: {
   const parts: string[] = [];
 
   parts.push(`## Creative Direction\n${input.creativeDirection}`);
+
+  if (input.emotionalTone) {
+    parts.push(`## Emotional Tone\n${input.emotionalTone}`);
+  }
+
+  if (input.archetypeName) {
+    parts.push(`## Consumer Archetype\n${input.archetypeName}\nUse this archetype to shape the character's personality, environment, wardrobe, speech patterns, and overall vibe. The archetype should drive the creative direction of the entire prompt.`);
+  }
 
   if (input.ageRange || input.gender || input.profile) {
     parts.push(`## Character`);

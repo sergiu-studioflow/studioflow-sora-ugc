@@ -115,6 +115,11 @@ Compliance Notes
 
 ## Section Rules
 
+### Emotional Tone & Consumer Archetype
+- If an emotional tone is provided (e.g., "confident", "frustrated", "raw", "spiritual"), it should permeate EVERYTHING: the character's micro-expressions, dialogue cadence, environment mood, and camera energy
+- If a consumer archetype is provided (e.g., "Wellness Mom", "Gen Z Creator", "Luxury Minimalist"), use it to drive the character's personality, environment, wardrobe, speech patterns, and overall creative direction
+- The archetype shapes WHO the person is; the emotional tone shapes HOW they feel in the moment
+
 ### Character & Appearance
 - Be specific about age, build, hair, skin texture, grooming
 - Match the consumer archetype to the product category
@@ -141,6 +146,7 @@ Compliance Notes
   * Social proof ("Everyone's been asking...")
   * Obstacle-to-win ("I struggled with X until...")
   * Relatability ("If you're like me...")
+  * Status shift ("I never thought I'd be the person who...")
 
 ### Visual Realism Rules (embed these into Scene Structure and Camera Style)
 1. True handheld iPhone front camera realism

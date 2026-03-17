@@ -18,6 +18,7 @@ export type StudioState = {
   expression: string;
   hair: string;
   clothing: string;
+  emotionalTone: string;
   productImageUrl: string;
   productImagePreview: string;
   aspectRatio: string;
@@ -54,6 +55,7 @@ const initialState: StudioState = {
   expression: "",
   hair: "",
   clothing: "",
+  emotionalTone: "",
   productImageUrl: "",
   productImagePreview: "",
   aspectRatio: "9:16",
@@ -114,6 +116,7 @@ export function StudioLayout() {
           expression: state.expression,
           hair: state.hair,
           clothing: state.clothing,
+          emotionalTone: state.emotionalTone,
           productImageUrl: state.productImageUrl,
           aspectRatio: state.aspectRatio,
           duration: state.duration,

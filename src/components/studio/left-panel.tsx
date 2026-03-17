@@ -199,6 +199,19 @@ export function LeftPanel({ state, dispatch, onGenerate, isGenerating, onUploadi
           ))}
         </div>
 
+        {/* Emotional Tone */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            Emotional Tone
+          </label>
+          <Input
+            value={state.emotionalTone}
+            onChange={(e) => setField("emotionalTone", e.target.value)}
+            placeholder="e.g. confident, frustrated, raw, spiritual"
+            className="text-xs h-8"
+          />
+        </div>
+
         {/* Product Image Upload */}
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">

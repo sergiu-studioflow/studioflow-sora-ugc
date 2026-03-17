@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
       expression,
       hair,
       clothing,
+      emotionalTone,
       productImageUrl,
       aspectRatio = "9:16",
       duration = 8,
@@ -57,6 +58,17 @@ export async function POST(req: NextRequest) {
       })
       .returning();
 
+    // Look up archetype name if selected (pass to Claude as creative concept)
+    let archetypeName: string | undefined;
+    if (archetypeId) {
+      const [arch] = await db
+        .select({ name: schema.archetypes.name })
+        .from(schema.archetypes)
+        .where(eq(schema.archetypes.id, archetypeId))
+        .limit(1);
+      if (arch) archetypeName = arch.name;
+    }
+
     // Call Claude to generate structured prompt
     const promptResult = await generateSoraPrompt({
       creativeDirection,
@@ -67,6 +79,8 @@ export async function POST(req: NextRequest) {
       expression,
       hair,
       clothing,
+      emotionalTone,
+      archetypeName,
       duration,
       aspectRatio,
     });
