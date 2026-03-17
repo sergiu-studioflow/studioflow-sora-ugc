@@ -29,6 +29,15 @@ export type SoraCharacter = {
   createdAt: string;
 };
 
+export type Product = {
+  id: string;
+  name: string;
+  description: string | null;
+  imageUrl: string | null;
+  isActive: boolean;
+  createdAt: string;
+};
+
 export type Generation = {
   id: string;
   creativeDirection: string | null;

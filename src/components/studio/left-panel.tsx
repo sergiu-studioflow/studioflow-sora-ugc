@@ -6,7 +6,7 @@ import { Upload as UploadIcon, Sparkles, Shuffle, X, Plus, Trash2 } from "lucide
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { Archetype, SoraCharacter } from "@/lib/types";
+import type { Archetype, SoraCharacter, Product } from "@/lib/types";
 import type { Scene } from "./studio-layout";
 import { cn } from "@/lib/utils";
 
@@ -31,12 +31,15 @@ const SCENE_TYPES = [
 export function LeftPanel({ state, dispatch, onGenerate, isGenerating, onUploadingChange }: Props) {
   const [archetypes, setArchetypes] = useState<Archetype[]>([]);
   const [soraChars, setSoraChars] = useState<SoraCharacter[]>([]);
+  const [savedProducts, setSavedProducts] = useState<Product[]>([]);
+  const [productMode, setProductMode] = useState<"saved" | "upload">("saved");
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
 
   useEffect(() => {
     fetch("/api/archetypes").then((r) => r.json()).then(setArchetypes).catch(() => {});
     fetch("/api/sora-characters").then((r) => r.json()).then(setSoraChars).catch(() => {});
+    fetch("/api/products").then((r) => r.json()).then(setSavedProducts).catch(() => {});
   }, []);
 
   const handleImageUpload = async (file: File) => {
@@ -420,61 +423,128 @@ export function LeftPanel({ state, dispatch, onGenerate, isGenerating, onUploadi
           />
         </div>
 
-        {/* Product Image Upload */}
-        <div className="space-y-1.5">
+        {/* Product Reference */}
+        <div className="space-y-2">
           <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             Product Reference
           </label>
-          {state.productImagePreview ? (
-            <div className="relative group">
-              <img
-                src={state.productImagePreview}
-                alt="Product"
-                className="w-full h-32 object-contain rounded-lg border border-border bg-card"
-              />
+
+          {/* Product mode toggle */}
+          <div className="flex gap-1.5">
+            {([
+              { value: "saved" as const, label: "Saved Product" },
+              { value: "upload" as const, label: "Upload" },
+            ]).map(({ value, label }) => (
               <button
-                onClick={() => {
-                  dispatch({ type: "SET_FIELD", field: "productImagePreview", value: "" });
-                  dispatch({ type: "SET_FIELD", field: "productImageUrl", value: "" });
-                }}
-                className="absolute top-1 right-1 p-1 rounded-full bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity"
+                key={value}
+                onClick={() => setProductMode(value)}
+                className={cn(
+                  "flex-1 rounded-md border py-1 text-[10px] font-medium transition-all",
+                  productMode === value
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border text-muted-foreground hover:border-foreground/30"
+                )}
               >
-                <X className="h-3 w-3" />
+                {label}
               </button>
-              {uploading && (
-                <div className="absolute inset-0 flex items-center justify-center bg-background/60 rounded-lg">
-                  <span className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                </div>
+            ))}
+          </div>
+
+          {/* Saved Product selector */}
+          {productMode === "saved" && (
+            <div className="space-y-2">
+              <select
+                onChange={(e) => {
+                  const prod = savedProducts.find((p) => p.id === e.target.value);
+                  if (prod) {
+                    dispatch({ type: "SET_FIELD", field: "productImageUrl", value: prod.imageUrl || "" });
+                    dispatch({ type: "SET_FIELD", field: "productImagePreview", value: prod.imageUrl || "" });
+                  }
+                }}
+                className="w-full text-xs bg-card border border-border rounded-md px-2 py-1.5 text-foreground"
+              >
+                <option value="">Select a product...</option>
+                {savedProducts.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+              {savedProducts.length === 0 && (
+                <p className="text-[11px] text-muted-foreground">
+                  No products saved yet. Go to the Products page to add one.
+                </p>
               )}
-              {!uploading && state.productImageUrl && (
-                <div className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-green-600/80 text-[10px] text-white">
-                  Uploaded
+              {state.productImagePreview && (
+                <div className="relative">
+                  <img src={state.productImagePreview} alt="Product" className="w-full h-28 object-contain rounded-lg border border-border bg-card" />
+                  <button
+                    onClick={() => {
+                      dispatch({ type: "SET_FIELD", field: "productImagePreview", value: "" });
+                      dispatch({ type: "SET_FIELD", field: "productImageUrl", value: "" });
+                    }}
+                    className="absolute top-1 right-1 p-1 rounded-full bg-background/80 hover:bg-background"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
                 </div>
               )}
             </div>
-          ) : (
-            <div
-              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={handleDrop}
-              onClick={() => {
-                const input = document.createElement("input");
-                input.type = "file";
-                input.accept = "image/*";
-                input.onchange = (e) => {
-                  const file = (e.target as HTMLInputElement).files?.[0];
-                  if (file) handleImageUpload(file);
-                };
-                input.click();
-              }}
-              className={cn(
-                "flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-6 cursor-pointer transition-colors",
-                dragOver ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground"
+          )}
+
+          {/* Upload mode */}
+          {productMode === "upload" && (
+            <>
+              {state.productImagePreview ? (
+                <div className="relative group">
+                  <img
+                    src={state.productImagePreview}
+                    alt="Product"
+                    className="w-full h-32 object-contain rounded-lg border border-border bg-card"
+                  />
+                  <button
+                    onClick={() => {
+                      dispatch({ type: "SET_FIELD", field: "productImagePreview", value: "" });
+                      dispatch({ type: "SET_FIELD", field: "productImageUrl", value: "" });
+                    }}
+                    className="absolute top-1 right-1 p-1 rounded-full bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                  {uploading && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-background/60 rounded-lg">
+                      <span className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                    </div>
+                  )}
+                  {!uploading && state.productImageUrl && (
+                    <div className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-green-600/80 text-[10px] text-white">
+                      Uploaded
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={handleDrop}
+                  onClick={() => {
+                    const input = document.createElement("input");
+                    input.type = "file";
+                    input.accept = "image/*";
+                    input.onchange = (e) => {
+                      const file = (e.target as HTMLInputElement).files?.[0];
+                      if (file) handleImageUpload(file);
+                    };
+                    input.click();
+                  }}
+                  className={cn(
+                    "flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-6 cursor-pointer transition-colors",
+                    dragOver ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground"
+                  )}
+                >
+                  <UploadIcon className="h-5 w-5 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">Drop image or click</span>
+                </div>
               )}
-            >
-              <UploadIcon className="h-5 w-5 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">Drop image or click</span>
-            </div>
+            </>
           )}
         </div>
 

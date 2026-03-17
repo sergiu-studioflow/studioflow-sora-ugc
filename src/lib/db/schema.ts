@@ -116,6 +116,21 @@ export const soraCharacters = pgTable("sora_characters", {
 });
 
 // =============================================
+// PRODUCTS — Saved product references with images
+// =============================================
+
+export const products = pgTable("products", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  imageUrl: text("image_url"), // Vercel Blob reference image
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// =============================================
 // GENERATIONS — Core video generation job table
 // =============================================
 
