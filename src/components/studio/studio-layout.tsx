@@ -28,6 +28,8 @@ export type StudioState = {
   characterMode: "sora-character" | "persona" | "custom";
   soraCharacterId: string;
   soraCharacterName: string;
+  productName: string;
+  productDescription: string;
   productImageUrl: string;
   productImagePreview: string;
   aspectRatio: string;
@@ -69,6 +71,8 @@ const initialState: StudioState = {
   characterMode: "custom",
   soraCharacterId: "",
   soraCharacterName: "",
+  productName: "",
+  productDescription: "",
   productImageUrl: "",
   productImagePreview: "",
   aspectRatio: "9:16",
@@ -171,6 +175,8 @@ export function StudioLayout() {
           emotionalTone: state.emotionalTone,
           characterMode: state.characterMode,
           soraCharacterName: state.soraCharacterName || undefined,
+          productName: state.productName || undefined,
+          productDescription: state.productDescription || undefined,
           productImageUrl: state.productImageUrl,
           aspectRatio: state.aspectRatio,
           duration: state.duration,

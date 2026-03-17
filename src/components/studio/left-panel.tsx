@@ -457,6 +457,8 @@ export function LeftPanel({ state, dispatch, onGenerate, isGenerating, onUploadi
                 onChange={(e) => {
                   const prod = savedProducts.find((p) => p.id === e.target.value);
                   if (prod) {
+                    dispatch({ type: "SET_FIELD", field: "productName", value: prod.name });
+                    dispatch({ type: "SET_FIELD", field: "productDescription", value: prod.description || "" });
                     dispatch({ type: "SET_FIELD", field: "productImageUrl", value: prod.imageUrl || "" });
                     dispatch({ type: "SET_FIELD", field: "productImagePreview", value: prod.imageUrl || "" });
                   }

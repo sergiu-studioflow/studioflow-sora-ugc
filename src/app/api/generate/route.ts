@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, isAuthError } from "@/lib/auth";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { generateSoraPrompt } from "@/lib/claude";
+import { generateSoraPrompt, analyzeProductImage } from "@/lib/claude";
 import { estimateCost } from "@/lib/sora";
 import { eq } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120; // 2 minutes for Claude prompt generation
+export const maxDuration = 120;
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,6 +27,8 @@ export async function POST(req: NextRequest) {
       emotionalTone,
       characterMode,
       soraCharacterName,
+      productName,
+      productDescription,
       productImageUrl,
       aspectRatio = "9:16",
       duration = 8,
@@ -75,6 +77,21 @@ export async function POST(req: NextRequest) {
       if (arch) archetypeName = arch.name;
     }
 
+    // Resolve product description:
+    // 1. From saved product (passed directly)
+    // 2. From uploaded image via Claude Vision analysis
+    // 3. None (Claude will generate minimal rules from context)
+    let resolvedProductDescription = productDescription;
+    if (!resolvedProductDescription && productImageUrl) {
+      try {
+        console.log("[generate] Analyzing product image via Claude Vision...");
+        resolvedProductDescription = await analyzeProductImage(productImageUrl);
+        console.log("[generate] Vision analysis:", resolvedProductDescription?.slice(0, 100));
+      } catch (err) {
+        console.error("[generate] Vision analysis failed, continuing without:", err);
+      }
+    }
+
     // Call Claude to generate structured prompt
     const promptResult = await generateSoraPrompt({
       creativeDirection: creativeDirection || "",
@@ -88,6 +105,8 @@ export async function POST(req: NextRequest) {
       emotionalTone,
       archetypeName,
       soraCharacterName: characterMode === "sora-character" ? soraCharacterName : undefined,
+      productName,
+      productDescription: resolvedProductDescription,
       storyboardMode,
       scenes,
       duration,

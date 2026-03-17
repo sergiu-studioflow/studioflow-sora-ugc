@@ -27,6 +27,7 @@ export async function generateSoraPrompt(input: {
   emotionalTone?: string;
   archetypeName?: string;
   soraCharacterName?: string;
+  productName?: string;
   productDescription?: string;
   storyboardMode?: boolean;
   scenes?: StoryboardScene[];
@@ -51,6 +52,39 @@ export async function generateSoraPrompt(input: {
   return { fullPrompt: text.trim() };
 }
 
+/**
+ * Analyze a product image using Claude Vision to extract visual description.
+ * Used when no saved product description is available.
+ */
+export async function analyzeProductImage(imageUrl: string): Promise<string> {
+  const response = await getClient().messages.create({
+    model: "claude-sonnet-4-5-20250929",
+    max_tokens: 300,
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "image",
+            source: { type: "url", url: imageUrl },
+          },
+          {
+            type: "text",
+            text: "Describe this product's physical appearance for an AI video prompt. Be specific about: packaging material and color, lid/cap style and color, label text and design, overall shape and proportions, and size relative to a hand. Return ONLY the description, no commentary.",
+          },
+        ],
+      },
+    ],
+  });
+
+  const text = response.content
+    .filter((block) => block.type === "text")
+    .map((block) => block.text)
+    .join("");
+
+  return text.trim();
+}
+
 function buildUserMessage(input: {
   creativeDirection: string;
   ageRange?: string;
@@ -63,6 +97,7 @@ function buildUserMessage(input: {
   emotionalTone?: string;
   archetypeName?: string;
   soraCharacterName?: string;
+  productName?: string;
   productDescription?: string;
   storyboardMode?: boolean;
   scenes?: StoryboardScene[];
@@ -92,12 +127,12 @@ function buildUserMessage(input: {
   }
 
   if (input.archetypeName) {
-    parts.push(`## Consumer Archetype\n${input.archetypeName}\nUse this archetype to shape the character's personality, environment, wardrobe, speech patterns, and overall vibe. The archetype should drive the creative direction of the entire prompt.`);
+    parts.push(`## Consumer Archetype\n${input.archetypeName}\nUse this archetype to shape the character's personality, environment, wardrobe, speech patterns, and overall vibe.`);
   }
 
   // Sora Character mode: reference saved character by @name
   if (input.soraCharacterName) {
-    parts.push(`## Character\nUsing saved Sora character: @${input.soraCharacterName}\nIMPORTANT: In the Character section of the prompt output, write "@${input.soraCharacterName}" as the character reference. Sora will use this saved character's appearance automatically. Do NOT invent physical appearance details — only describe personality, energy, and emotional tone.`);
+    parts.push(`## Character\nUsing saved Sora character: @${input.soraCharacterName}\nIn the Character section, reference this character as @${input.soraCharacterName}. Sora handles the appearance. Only describe personality, energy, and emotional tone.`);
   } else if (input.ageRange || input.gender || input.profile) {
     parts.push(`## Character`);
     if (input.ageRange) parts.push(`- Age range: ${input.ageRange}`);
@@ -105,7 +140,7 @@ function buildUserMessage(input: {
     if (input.profile) parts.push(`- Profile: ${input.profile}`);
   }
 
-  if (input.makeup || input.expression || input.hair || input.clothing) {
+  if (!input.soraCharacterName && (input.makeup || input.expression || input.hair || input.clothing)) {
     parts.push(`## Appearance`);
     if (input.makeup) parts.push(`- Makeup: ${input.makeup}`);
     if (input.expression) parts.push(`- Expression: ${input.expression}`);
@@ -113,8 +148,12 @@ function buildUserMessage(input: {
     if (input.clothing) parts.push(`- Clothing: ${input.clothing}`);
   }
 
-  if (input.productDescription) {
-    parts.push(`## Product\n${input.productDescription}`);
+  // Product info
+  if (input.productName || input.productDescription) {
+    const productParts: string[] = [];
+    if (input.productName) productParts.push(`Product name: ${input.productName}`);
+    if (input.productDescription) productParts.push(`Visual description: ${input.productDescription}`);
+    parts.push(`## Product\n${productParts.join("\n")}`);
   }
 
   parts.push(`## Video Settings`);
