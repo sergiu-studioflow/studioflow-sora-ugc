@@ -101,6 +101,21 @@ export const archetypes = pgTable("archetypes", {
 });
 
 // =============================================
+// SORA CHARACTERS — Saved Sora character references (@name)
+// =============================================
+
+export const soraCharacters = pgTable("sora_characters", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(), // the @name as saved in Sora
+  description: text("description"),
+  thumbnailUrl: text("thumbnail_url"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// =============================================
 // GENERATIONS — Core video generation job table
 // =============================================
 

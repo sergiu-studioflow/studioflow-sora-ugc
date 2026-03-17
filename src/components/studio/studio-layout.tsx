@@ -1,7 +1,6 @@
 "use client";
 
 import { useReducer, useState, useCallback } from "react";
-import Image from "next/image";
 import { LeftPanel } from "./left-panel";
 import { MiddlePanel } from "./middle-panel";
 import { RightPanel } from "./right-panel";
@@ -26,6 +25,9 @@ export type StudioState = {
   hair: string;
   clothing: string;
   emotionalTone: string;
+  characterMode: "sora-character" | "persona" | "custom";
+  soraCharacterId: string;
+  soraCharacterName: string;
   productImageUrl: string;
   productImagePreview: string;
   aspectRatio: string;
@@ -64,6 +66,9 @@ const initialState: StudioState = {
   hair: "",
   clothing: "",
   emotionalTone: "",
+  characterMode: "custom",
+  soraCharacterId: "",
+  soraCharacterName: "",
   productImageUrl: "",
   productImagePreview: "",
   aspectRatio: "9:16",
@@ -164,6 +169,8 @@ export function StudioLayout() {
           hair: state.hair,
           clothing: state.clothing,
           emotionalTone: state.emotionalTone,
+          characterMode: state.characterMode,
+          soraCharacterName: state.soraCharacterName || undefined,
           productImageUrl: state.productImageUrl,
           aspectRatio: state.aspectRatio,
           duration: state.duration,
@@ -276,23 +283,7 @@ export function StudioLayout() {
   }, []);
 
   return (
-    <div className="flex h-screen flex-col bg-background">
-      <header className="flex h-14 shrink-0 items-center justify-between border-b border-border px-6">
-        <div className="flex items-center gap-2">
-          <Image
-            src="/studioflow-logo.png"
-            alt="StudioFlow"
-            width={28}
-            height={28}
-            className="rounded-lg"
-          />
-          <span className="text-sm font-semibold text-foreground">AI UGC Studio</span>
-        </div>
-        <div className="text-xs text-muted-foreground">
-          AI-Powered Video Generation
-        </div>
-      </header>
-
+    <div className="flex h-full flex-col bg-background">
       <div className="grid flex-1 grid-cols-[320px_1fr_380px] overflow-hidden">
         <LeftPanel
           state={state}

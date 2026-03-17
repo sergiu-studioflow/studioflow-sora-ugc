@@ -20,6 +20,15 @@ export type Archetype = {
   defaultClothing: string | null;
 };
 
+export type SoraCharacter = {
+  id: string;
+  name: string;
+  description: string | null;
+  thumbnailUrl: string | null;
+  isActive: boolean;
+  createdAt: string;
+};
+
 export type Generation = {
   id: string;
   creativeDirection: string | null;

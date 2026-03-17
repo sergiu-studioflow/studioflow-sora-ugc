@@ -26,6 +26,7 @@ export async function generateSoraPrompt(input: {
   clothing?: string;
   emotionalTone?: string;
   archetypeName?: string;
+  soraCharacterName?: string;
   productDescription?: string;
   storyboardMode?: boolean;
   scenes?: StoryboardScene[];
@@ -61,6 +62,7 @@ function buildUserMessage(input: {
   clothing?: string;
   emotionalTone?: string;
   archetypeName?: string;
+  soraCharacterName?: string;
   productDescription?: string;
   storyboardMode?: boolean;
   scenes?: StoryboardScene[];
@@ -93,7 +95,10 @@ function buildUserMessage(input: {
     parts.push(`## Consumer Archetype\n${input.archetypeName}\nUse this archetype to shape the character's personality, environment, wardrobe, speech patterns, and overall vibe. The archetype should drive the creative direction of the entire prompt.`);
   }
 
-  if (input.ageRange || input.gender || input.profile) {
+  // Sora Character mode: reference saved character by @name
+  if (input.soraCharacterName) {
+    parts.push(`## Character\nUsing saved Sora character: @${input.soraCharacterName}\nIMPORTANT: In the Character section of the prompt output, write "@${input.soraCharacterName}" as the character reference. Sora will use this saved character's appearance automatically. Do NOT invent physical appearance details — only describe personality, energy, and emotional tone.`);
+  } else if (input.ageRange || input.gender || input.profile) {
     parts.push(`## Character`);
     if (input.ageRange) parts.push(`- Age range: ${input.ageRange}`);
     if (input.gender) parts.push(`- Gender: ${input.gender}`);

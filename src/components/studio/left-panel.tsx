@@ -6,7 +6,7 @@ import { Upload as UploadIcon, Sparkles, Shuffle, X, Plus, Trash2 } from "lucide
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { Archetype } from "@/lib/types";
+import type { Archetype, SoraCharacter } from "@/lib/types";
 import type { Scene } from "./studio-layout";
 import { cn } from "@/lib/utils";
 
@@ -30,14 +30,13 @@ const SCENE_TYPES = [
 
 export function LeftPanel({ state, dispatch, onGenerate, isGenerating, onUploadingChange }: Props) {
   const [archetypes, setArchetypes] = useState<Archetype[]>([]);
+  const [soraChars, setSoraChars] = useState<SoraCharacter[]>([]);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
 
   useEffect(() => {
-    fetch("/api/archetypes")
-      .then((r) => r.json())
-      .then(setArchetypes)
-      .catch(() => {});
+    fetch("/api/archetypes").then((r) => r.json()).then(setArchetypes).catch(() => {});
+    fetch("/api/sora-characters").then((r) => r.json()).then(setSoraChars).catch(() => {});
   }, []);
 
   const handleImageUpload = async (file: File) => {
@@ -248,9 +247,76 @@ export function LeftPanel({ state, dispatch, onGenerate, isGenerating, onUploadi
 
         {/* Character Section */}
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Character</span>
-            {archetypes.length > 0 && (
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Character</span>
+
+          {/* 3-mode toggle */}
+          <div className="flex gap-1">
+            {([
+              { value: "sora-character", label: "Sora Character" },
+              { value: "persona", label: "Persona" },
+              { value: "custom", label: "Custom" },
+            ] as const).map(({ value, label }) => (
+              <button
+                key={value}
+                onClick={() => setField("characterMode", value)}
+                className={cn(
+                  "flex-1 rounded-md border py-1 text-[10px] font-medium transition-all",
+                  state.characterMode === value
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border text-muted-foreground hover:border-foreground/30"
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Sora Character mode */}
+          {state.characterMode === "sora-character" && (
+            <div className="space-y-2">
+              <select
+                value={state.soraCharacterId}
+                onChange={(e) => {
+                  const char = soraChars.find((c) => c.id === e.target.value);
+                  if (char) {
+                    dispatch({
+                      type: "SET_FIELD",
+                      field: "soraCharacterId",
+                      value: char.id,
+                    });
+                    dispatch({
+                      type: "SET_FIELD",
+                      field: "soraCharacterName",
+                      value: char.name,
+                    });
+                  }
+                }}
+                className="w-full text-xs bg-card border border-border rounded-md px-2 py-1.5 text-foreground"
+              >
+                <option value="">Select a Sora character...</option>
+                {soraChars.map((c) => (
+                  <option key={c.id} value={c.id}>@{c.name}</option>
+                ))}
+              </select>
+              {soraChars.length === 0 && (
+                <p className="text-[11px] text-muted-foreground">
+                  No characters saved yet. Go to the Characters page to add one.
+                </p>
+              )}
+              {state.soraCharacterName && (
+                <div className="rounded-md bg-primary/5 border border-primary/20 px-3 py-2">
+                  <p className="text-xs text-foreground font-medium">@{state.soraCharacterName}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    This character will be referenced by @name in the prompt. Sora handles the appearance.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Persona mode */}
+          {state.characterMode === "persona" && (
+            <div className="space-y-2">
               <select
                 value={state.archetypeId}
                 onChange={(e) => {
@@ -271,70 +337,75 @@ export function LeftPanel({ state, dispatch, onGenerate, isGenerating, onUploadi
                     });
                   }
                 }}
-                className="text-xs bg-card border border-border rounded-md px-2 py-1 text-foreground"
+                className="w-full text-xs bg-card border border-border rounded-md px-2 py-1.5 text-foreground"
               >
-                <option value="">Select archetype...</option>
+                <option value="">Select a persona...</option>
                 {archetypes.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
+                  <option key={a.id} value={a.id}>{a.name}</option>
                 ))}
               </select>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-[11px] text-muted-foreground">Age Range</label>
-              <Input
-                value={state.ageRange}
-                onChange={(e) => setField("ageRange", e.target.value)}
-                placeholder="25-34"
-                className="text-xs h-8"
-              />
             </div>
-            <div>
-              <label className="text-[11px] text-muted-foreground">Gender</label>
-              <Input
-                value={state.gender}
-                onChange={(e) => setField("gender", e.target.value)}
-                placeholder="Female"
-                className="text-xs h-8"
-              />
-            </div>
-          </div>
+          )}
 
-          <div>
-            <label className="text-[11px] text-muted-foreground">Profile</label>
-            <Input
-              value={state.profile}
-              onChange={(e) => setField("profile", e.target.value)}
-              placeholder="busy mum of young kids"
-              className="text-xs h-8"
-            />
-          </div>
+          {/* Character detail fields — shown for Persona and Custom modes */}
+          {state.characterMode !== "sora-character" && (
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] text-muted-foreground">Age Range</label>
+                  <Input
+                    value={state.ageRange}
+                    onChange={(e) => setField("ageRange", e.target.value)}
+                    placeholder="25-34"
+                    className="text-xs h-8"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-muted-foreground">Gender</label>
+                  <Input
+                    value={state.gender}
+                    onChange={(e) => setField("gender", e.target.value)}
+                    placeholder="Female"
+                    className="text-xs h-8"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] text-muted-foreground">Profile</label>
+                <Input
+                  value={state.profile}
+                  onChange={(e) => setField("profile", e.target.value)}
+                  placeholder="busy mum of young kids"
+                  className="text-xs h-8"
+                />
+              </div>
+            </>
+          )}
         </div>
 
-        {/* Appearance */}
-        <div className="space-y-2">
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Appearance</span>
-          {[
-            { key: "makeup", label: "Makeup", placeholder: "natural makeup" },
-            { key: "expression", label: "Expression", placeholder: "warm, genuine smile" },
-            { key: "hair", label: "Hair", placeholder: "hair tied up casually" },
-            { key: "clothing", label: "Clothing", placeholder: "comfortable home clothing" },
-          ].map(({ key, label, placeholder }) => (
-            <div key={key}>
-              <label className="text-[11px] text-muted-foreground">{label}</label>
-              <Input
-                value={(state as any)[key]}
-                onChange={(e) => setField(key, e.target.value)}
-                placeholder={placeholder}
-                className="text-xs h-8"
-              />
-            </div>
-          ))}
-        </div>
+        {/* Appearance — hidden in Sora Character mode */}
+        {state.characterMode !== "sora-character" && (
+          <div className="space-y-2">
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Appearance</span>
+            {[
+              { key: "makeup", label: "Makeup", placeholder: "natural makeup" },
+              { key: "expression", label: "Expression", placeholder: "warm, genuine smile" },
+              { key: "hair", label: "Hair", placeholder: "hair tied up casually" },
+              { key: "clothing", label: "Clothing", placeholder: "comfortable home clothing" },
+            ].map(({ key, label, placeholder }) => (
+              <div key={key}>
+                <label className="text-[11px] text-muted-foreground">{label}</label>
+                <Input
+                  value={(state as any)[key]}
+                  onChange={(e) => setField(key, e.target.value)}
+                  placeholder={placeholder}
+                  className="text-xs h-8"
+                />
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Emotional Tone */}
         <div className="space-y-1.5">

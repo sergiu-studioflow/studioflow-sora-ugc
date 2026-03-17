@@ -20,7 +20,7 @@ export function middleware(request: NextRequest) {
 
   if (hasSession && request.nextUrl.pathname.startsWith("/login")) {
     const url = request.nextUrl.clone();
-    url.pathname = "/create";
+    url.pathname = "/studio";
     return NextResponse.redirect(url);
   }
 
