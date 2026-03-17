@@ -60,7 +60,7 @@ export async function generateFirstFrame(params: {
         prompt: framePrompt,
         image_input: [params.productImageUrl],
         aspect_ratio: aspectRatio,
-        resolution: "1K",
+        resolution: "2K",
         output_format: "png",
       },
     }),
