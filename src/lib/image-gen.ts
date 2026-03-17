@@ -5,8 +5,8 @@ const KIE_API_BASE = "https://api.kie.ai/api/v1/jobs";
 
 // Sora requires exact pixel dimensions for reference images
 const soraResolutionMap: Record<string, { width: number; height: number }> = {
-  "9:16": { width: 720, height: 1280 },
-  "16:9": { width: 1280, height: 720 },
+  "9:16": { width: 1080, height: 1920 },
+  "16:9": { width: 1920, height: 1080 },
   "720p": { width: 1280, height: 720 },
 };
 

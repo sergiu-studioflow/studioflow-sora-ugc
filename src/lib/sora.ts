@@ -8,8 +8,8 @@ function getApiKey(): string {
 
 // Maps our aspect ratio labels to Sora's accepted size values
 const sizeMap: Record<string, string> = {
-  "9:16": "720x1280",
-  "16:9": "1280x720",
+  "9:16": "1080x1920",
+  "16:9": "1920x1080",
   "720p": "1280x720",
 };
 
@@ -39,7 +39,7 @@ export async function submitSoraJob(params: {
   model?: string;
 }): Promise<SoraJobResult> {
   const body: Record<string, unknown> = {
-    model: params.model || "sora-2",
+    model: params.model || "sora-2-pro",
     prompt: params.prompt,
     size: sizeMap[params.aspectRatio] || "720x1280",
     seconds: clampDuration(params.duration),
@@ -114,7 +114,7 @@ export async function pollSoraJob(jobId: string): Promise<SoraPollResult> {
   }
 }
 
-export function estimateCost(duration: number, model: string = "sora-2"): string {
+export function estimateCost(duration: number, model: string = "sora-2-pro"): string {
   // Pricing per second by resolution tier (using 720p default rates)
   const rates: Record<string, number> = {
     "sora-2": 0.30,

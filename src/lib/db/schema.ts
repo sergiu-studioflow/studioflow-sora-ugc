@@ -131,7 +131,7 @@ export const generations = pgTable("generations", {
 
   // Sora tracking
   soraJobId: text("sora_job_id"),
-  soraModel: text("sora_model").default("sora-2"),
+  soraModel: text("sora_model").default("sora-2-pro"),
 
   // Status: draft | generating_prompt | prompt_ready | creating_video | video_ready | error
   status: text("status").notNull().default("draft"),
