@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
       })
       .returning();
 
-    // Call Claude to generate prompt
+    // Call Claude to generate structured prompt
     const promptResult = await generateSoraPrompt({
       creativeDirection,
       ageRange,
@@ -71,13 +71,6 @@ export async function POST(req: NextRequest) {
       aspectRatio,
     });
 
-    // Assemble full prompt for Sora
-    const fullPrompt = [
-      promptResult.sceneDescription,
-      `\n\nDialogue (voiceover):\n${promptResult.dialogue}`,
-      `\n\nVisual constraints:\n${promptResult.negativePrompt}`,
-    ].join("");
-
     const cost = estimateCost(duration);
 
     // Generate composed first frame if product image was uploaded
@@ -88,7 +81,7 @@ export async function POST(req: NextRequest) {
       try {
         referenceFrameUrl = await generateFirstFrame({
           productImageUrl,
-          sceneDescription: promptResult.sceneDescription,
+          sceneDescription: promptResult.frameDescription,
           aspectRatio,
           characterDetails: {
             ageRange,
@@ -115,11 +108,11 @@ export async function POST(req: NextRequest) {
     const [updated] = await db
       .update(schema.generations)
       .set({
-        sceneDescription: promptResult.sceneDescription,
-        dialogue: promptResult.dialogue,
-        complianceNotes: promptResult.complianceNotes,
-        negativePrompt: promptResult.negativePrompt,
-        fullPrompt,
+        sceneDescription: promptResult.frameDescription,
+        dialogue: "",
+        complianceNotes: "",
+        negativePrompt: "",
+        fullPrompt: promptResult.fullPrompt,
         estimatedCost: cost,
         thumbnailUrl: referenceFrameUrl,
         status: "prompt_ready",
@@ -130,10 +123,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       id: updated.id,
-      sceneDescription: updated.sceneDescription,
-      dialogue: updated.dialogue,
-      complianceNotes: updated.complianceNotes,
-      negativePrompt: updated.negativePrompt,
       fullPrompt: updated.fullPrompt,
       estimatedCost: updated.estimatedCost,
       referenceFrameUrl: updated.thumbnailUrl,

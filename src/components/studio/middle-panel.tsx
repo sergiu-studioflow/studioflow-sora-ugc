@@ -4,7 +4,6 @@ import { type Dispatch } from "react";
 import { Eye, Send, X, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
 
 type Props = {
   state: any;
@@ -16,10 +15,6 @@ type Props = {
 export function MiddlePanel({ state, dispatch, onSendToSora, isSending }: Props) {
   const hasPrompt = state.status !== "draft" && state.status !== "generating_prompt";
   const isEditable = state.status === "prompt_ready";
-
-  const setField = (field: string, value: string) => {
-    dispatch({ type: "SET_FIELD", field, value });
-  };
 
   if (state.status === "generating_prompt") {
     return (
@@ -56,13 +51,6 @@ export function MiddlePanel({ state, dispatch, onSendToSora, isSending }: Props)
     );
   }
 
-  const sections = [
-    { key: "sceneDescription", label: "Scene Description", icon: "camera" },
-    { key: "dialogue", label: "Dialogue (voiceover)", icon: "mic" },
-    { key: "complianceNotes", label: "Messaging Compliance", icon: "shield" },
-    { key: "negativePrompt", label: "Negative Prompt", icon: "x" },
-  ];
-
   return (
     <div className="flex flex-col border-r border-border overflow-hidden">
       <div className="flex items-center justify-between p-4 border-b border-border">
@@ -72,7 +60,7 @@ export function MiddlePanel({ state, dispatch, onSendToSora, isSending }: Props)
         </div>
         {state.status === "prompt_ready" && (
           <button
-            onClick={() => dispatch({ type: "SET_GENERATION", payload: { status: "draft", generationId: null, sceneDescription: "", dialogue: "", complianceNotes: "", negativePrompt: "" } })}
+            onClick={() => dispatch({ type: "SET_GENERATION", payload: { status: "draft", generationId: null, fullPrompt: "" } })}
             className="p-1 rounded hover:bg-accent"
           >
             <X className="h-4 w-4 text-muted-foreground" />
@@ -90,26 +78,23 @@ export function MiddlePanel({ state, dispatch, onSendToSora, isSending }: Props)
           <span>Style: authentic UGC phone video</span>
         </div>
 
-        {/* Prompt sections (hidden when error) */}
-        {state.status !== "error" && sections.map(({ key, label }) => {
-          const value = (state as any)[key] || "";
-          return (
-            <div key={key} className="space-y-1.5">
-              <label className="text-xs font-semibold text-foreground">{label}</label>
-              {isEditable ? (
-                <Textarea
-                  value={value}
-                  onChange={(e) => setField(key, e.target.value)}
-                  className="text-sm min-h-[100px] resize-none"
-                />
-              ) : (
-                <div className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
-                  {value || "\u2014"}
-                </div>
-              )}
-            </div>
-          );
-        })}
+        {/* Full prompt (single editable textarea) */}
+        {state.status !== "error" && (
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-foreground">Sora Prompt</label>
+            {isEditable ? (
+              <Textarea
+                value={state.fullPrompt || ""}
+                onChange={(e) => dispatch({ type: "SET_FIELD", field: "fullPrompt", value: e.target.value })}
+                className="text-sm font-mono min-h-[500px] resize-y leading-relaxed"
+              />
+            ) : (
+              <div className="text-sm font-mono text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                {state.fullPrompt || "\u2014"}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Frame generation error warning */}
         {state.frameError && !state.referenceFrameUrl && state.status !== "error" && (

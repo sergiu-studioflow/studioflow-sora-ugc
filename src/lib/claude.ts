@@ -6,10 +6,8 @@ function getClient() {
 }
 
 export type PromptResult = {
-  sceneDescription: string;
-  dialogue: string;
-  complianceNotes: string;
-  negativePrompt: string;
+  fullPrompt: string;
+  frameDescription: string;
 };
 
 export async function generateSoraPrompt(input: {
@@ -87,43 +85,66 @@ function buildUserMessage(input: {
   return parts.join("\n\n");
 }
 
+const METADATA_DELIMITER = "===FRAME_METADATA===";
+
 function parsePromptResponse(text: string): PromptResult {
-  // Try direct JSON parse first
-  try {
-    const parsed = JSON.parse(text);
-    return validatePromptResult(parsed);
-  } catch {
-    // Strip markdown wrapping if present
-    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (jsonMatch) {
-      try {
-        const parsed = JSON.parse(jsonMatch[1].trim());
-        return validatePromptResult(parsed);
-      } catch {
-        // Fall through
+  const delimiterIndex = text.indexOf(METADATA_DELIMITER);
+
+  if (delimiterIndex !== -1) {
+    const fullPrompt = text.slice(0, delimiterIndex).trim();
+    const metadataText = text.slice(delimiterIndex + METADATA_DELIMITER.length).trim();
+
+    let frameDescription = "";
+    try {
+      const metadata = JSON.parse(metadataText);
+      frameDescription = metadata.frameDescription || "";
+    } catch {
+      // Try to extract JSON object from the metadata section
+      const jsonMatch = metadataText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          const metadata = JSON.parse(jsonMatch[0]);
+          frameDescription = metadata.frameDescription || "";
+        } catch {
+          // Fall through to extraction
+        }
       }
     }
 
-    // Try to find JSON object in text
-    const objectMatch = text.match(/\{[\s\S]*\}/);
-    if (objectMatch) {
-      try {
-        const parsed = JSON.parse(objectMatch[0]);
-        return validatePromptResult(parsed);
-      } catch {
-        // Fall through
-      }
+    // Fallback: extract from the prompt text itself
+    if (!frameDescription) {
+      frameDescription = extractFrameDescription(fullPrompt);
     }
 
-    throw new Error("Failed to parse Claude response as JSON");
+    return { fullPrompt, frameDescription };
   }
+
+  // No delimiter found — use entire text as prompt, extract frame description
+  const fullPrompt = text.trim();
+  const frameDescription = extractFrameDescription(fullPrompt);
+
+  return { fullPrompt, frameDescription };
 }
 
-function validatePromptResult(obj: Record<string, unknown>): PromptResult {
-  return {
-    sceneDescription: String(obj.sceneDescription || ""),
-    dialogue: String(obj.dialogue || ""),
-    complianceNotes: String(obj.complianceNotes || ""),
-    negativePrompt: String(obj.negativePrompt || ""),
-  };
+/**
+ * Extracts a frame description from the structured prompt text
+ * by finding the Environment and Character sections.
+ */
+function extractFrameDescription(promptText: string): string {
+  const parts: string[] = [];
+
+  // Extract Character line (first line after "Character" heading)
+  const charMatch = promptText.match(/^Character\n+(.+)/m);
+  if (charMatch) parts.push(charMatch[1].trim());
+
+  // Extract Environment line (first line after "Environment" heading)
+  const envMatch = promptText.match(/^Environment\n+(.+)/m);
+  if (envMatch) parts.push(envMatch[1].trim());
+
+  if (parts.length > 0) {
+    return parts.join(". ") + ".";
+  }
+
+  // Last resort: use first 200 chars
+  return promptText.slice(0, 200);
 }

@@ -33,25 +33,13 @@ export async function POST(
       return NextResponse.json({ error: "Generation is not ready for Sora" }, { status: 400 });
     }
 
-    // Build updated prompt from possibly-edited fields
-    const sceneDescription = body.sceneDescription || generation.sceneDescription;
-    const dialogue = body.dialogue || generation.dialogue;
-    const negativePrompt = body.negativePrompt || generation.negativePrompt;
-
-    const fullPrompt = [
-      sceneDescription,
-      `\n\nDialogue (voiceover):\n${dialogue}`,
-      `\n\nVisual constraints:\n${negativePrompt}`,
-    ].join("");
+    // Use the (possibly edited) fullPrompt directly
+    const fullPrompt = body.fullPrompt || generation.fullPrompt;
 
     // Update status to creating_video
     await db
       .update(schema.generations)
       .set({
-        sceneDescription,
-        dialogue,
-        complianceNotes: body.complianceNotes || generation.complianceNotes,
-        negativePrompt,
         fullPrompt,
         status: "creating_video",
         updatedAt: new Date(),
