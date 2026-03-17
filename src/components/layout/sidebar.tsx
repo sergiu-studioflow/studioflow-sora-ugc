@@ -3,11 +3,12 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Sparkles, Users, UserCircle, Package } from "lucide-react";
+import { Sparkles, Film, Users, UserCircle, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
   { name: "Studio", href: "/studio", icon: Sparkles },
+  { name: "Video Library", href: "/library", icon: Film },
   { name: "Sora Characters", href: "/characters", icon: Users },
   { name: "Personas", href: "/personas", icon: UserCircle },
   { name: "Products", href: "/products", icon: Package },
